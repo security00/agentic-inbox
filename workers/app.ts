@@ -61,6 +61,15 @@ app.use("*", async (c, next) => {
 
 	const token = c.req.header("cf-access-jwt-assertion");
 	if (!token) {
+		// Service bindings never get an Access JWT or cf-ray. Public edge always has cf-ray.
+		const isServiceBinding = !c.req.header("cf-ray");
+		const path = new URL(c.req.url).pathname;
+		const isSendApi =
+			c.req.method === "POST" &&
+			/^\/api\/v1\/mailboxes\/[^/]+\/emails$/.test(path);
+		if (isServiceBinding && isSendApi) {
+			return next();
+		}
 		return c.text("Missing required CF Access JWT", 403);
 	}
 
