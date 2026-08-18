@@ -34,7 +34,7 @@ export default function EmailAttachmentList({
 				<div className="flex items-center gap-2 mb-2">
 					<PaperclipIcon size={14} className="text-kumo-subtle" />
 					<span className="text-sm font-medium text-kumo-default">
-						{files.length} attachment{files.length !== 1 ? "s" : ""}
+						{files.length} 个附件
 					</span>
 				</div>
 			)}

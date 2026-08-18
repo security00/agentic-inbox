@@ -77,7 +77,7 @@ const KumoLink = forwardRef<
 
 export function Layout({ children }: { children: React.ReactNode }) {
 	return (
-		<html lang="en">
+		<html lang="zh-CN">
 			<head>
 				<meta charSet="UTF-8" />
 				<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
@@ -88,7 +88,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
 					sizes="48x48 32x32 16x16"
 				/>
 				<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-				<title>Agentic Inbox</title>
+				<title>Discover Keywords 邮箱</title>
 				<Meta />
 				<Links />
 			</head>
@@ -127,18 +127,18 @@ export default function App() {
 }
 
 export function ErrorBoundary({ error }: { error: unknown }) {
-	let title = "Something went wrong";
-	let description = "An unexpected error occurred. Please try again.";
+	let title = "出错了";
+	let description = "发生了意外错误，请重试。";
 	let status: number | null = null;
 
 	if (isRouteErrorResponse(error)) {
 		status = error.status;
 		if (error.status === 404) {
-			title = "Page not found";
+			title = "页面不存在";
 			description =
-				"The page you're looking for doesn't exist or has been moved.";
+				"你访问的页面不存在，或已被移动。";
 		} else {
-			title = `Error ${error.status}`;
+			title = `错误 ${error.status}`;
 			description = error.statusText || description;
 		}
 	} else if (error instanceof Error && import.meta.env.DEV) {
@@ -149,7 +149,7 @@ export function ErrorBoundary({ error }: { error: unknown }) {
 		<div className="flex items-center justify-center min-h-screen p-8">
 			<Empty
 				icon={<WarningIcon size={48} className="text-kumo-inactive" />}
-				title={status === 404 ? "404 — Page not found" : title}
+				title={status === 404 ? "404 — 页面不存在" : title}
 				description={description}
 				contents={
 					<Button
@@ -158,7 +158,7 @@ export function ErrorBoundary({ error }: { error: unknown }) {
 							window.location.href = "/";
 						}}
 					>
-						Go Home
+						返回首页
 					</Button>
 				}
 			/>

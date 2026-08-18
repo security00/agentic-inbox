@@ -19,12 +19,16 @@ export default function SettingsRoute() {
 	const updateMailboxMutation = useUpdateMailbox();
 
 	const [displayName, setDisplayName] = useState("");
+	const [signatureEnabled, setSignatureEnabled] = useState(false);
+	const [signatureText, setSignatureText] = useState("");
 	const [agentPrompt, setAgentPrompt] = useState("");
 	const [isSaving, setIsSaving] = useState(false);
 
 	useEffect(() => {
 		if (mailbox) {
 			setDisplayName(mailbox.settings?.fromName || mailbox.name || "");
+			setSignatureEnabled(Boolean(mailbox.settings?.signature?.enabled));
+			setSignatureText(mailbox.settings?.signature?.text || "");
 			setAgentPrompt(mailbox.settings?.agentSystemPrompt || "");
 		}
 	}, [mailbox]);
@@ -35,14 +39,18 @@ export default function SettingsRoute() {
 		const settings = {
 			...mailbox.settings,
 			fromName: displayName,
+			signature: {
+				enabled: signatureEnabled,
+				text: signatureText,
+			},
 			agentSystemPrompt: agentPrompt.trim() || undefined,
 		};
 		try {
 			await updateMailboxMutation.mutateAsync({ mailboxId, settings });
-			toastManager.add({ title: "Settings saved!" });
+			toastManager.add({ title: "设置已保存" });
 		} catch {
 			toastManager.add({
-				title: "Failed to save settings",
+				title: "保存设置失败",
 				variant: "error",
 			});
 		} finally {
@@ -66,22 +74,46 @@ export default function SettingsRoute() {
 
 	return (
 		<div className="max-w-2xl px-4 py-4 md:px-8 md:py-6 h-full overflow-y-auto">
-			<h1 className="text-lg font-semibold text-kumo-default mb-6">Settings</h1>
+			<h1 className="text-lg font-semibold text-kumo-default mb-6">设置</h1>
 
 			<div className="space-y-6">
-				{/* Account */}
+				{/* Identity */}
 				<div className="rounded-lg border border-kumo-line bg-kumo-base p-5">
 					<div className="text-sm font-medium text-kumo-default mb-4">
-						Account
+						身份
 					</div>
 					<div className="space-y-3">
 						<Input
-							label="Display Name"
+							label="显示名"
+							placeholder="发信时显示的名字"
 							value={displayName}
 							onChange={(e) => setDisplayName(e.target.value)}
 						/>
-						<Input label="Email" type="email" value={mailbox.email} disabled />
+						<Input label="邮箱地址" type="email" value={mailbox.email} disabled />
 					</div>
+				</div>
+
+				{/* Signature */}
+				<div className="rounded-lg border border-kumo-line bg-kumo-base p-5">
+					<div className="flex items-center justify-between mb-3">
+						<div className="text-sm font-medium text-kumo-default">签名</div>
+						<label className="flex items-center gap-2 text-sm text-kumo-default cursor-pointer">
+							<input
+								type="checkbox"
+								checked={signatureEnabled}
+								onChange={(e) => setSignatureEnabled(e.target.checked)}
+							/>
+							启用签名
+						</label>
+					</div>
+					<textarea
+						value={signatureText}
+						onChange={(e) => setSignatureText(e.target.value)}
+						placeholder="写在邮件末尾的签名"
+						rows={5}
+						disabled={!signatureEnabled}
+						className="w-full resize-y rounded-lg border border-kumo-line bg-kumo-recessed px-3 py-2 text-sm text-kumo-default placeholder:text-kumo-subtle focus:outline-none focus:ring-1 focus:ring-kumo-ring disabled:opacity-60"
+					/>
 				</div>
 
 				{/* Agent System Prompt */}
@@ -90,12 +122,12 @@ export default function SettingsRoute() {
 						<div className="flex items-center gap-2">
 							<RobotIcon size={16} weight="duotone" className="text-kumo-subtle" />
 							<span className="text-sm font-medium text-kumo-default">
-								AI Agent Prompt
+								AI 助手提示词
 							</span>
 							{isCustomPrompt ? (
-								<Badge variant="primary">Custom</Badge>
+								<Badge variant="primary">自定义</Badge>
 							) : (
-								<Badge variant="secondary">Default</Badge>
+								<Badge variant="secondary">默认</Badge>
 							)}
 						</div>
 						{isCustomPrompt && (
@@ -105,31 +137,29 @@ export default function SettingsRoute() {
 								icon={<ArrowCounterClockwiseIcon size={14} />}
 								onClick={handleResetPrompt}
 							>
-								Reset to default
+								恢复默认
 							</Button>
 						)}
 					</div>
 					<p className="text-xs text-kumo-subtle mb-3">
-						Customize how the AI agent behaves for this mailbox.
-						Leave empty to use the built-in default prompt.
+						自定义这个邮箱里 AI 助手的语气和规则。留空则使用内置默认提示词。
 					</p>
 					<textarea
 						value={agentPrompt}
 						onChange={(e) => setAgentPrompt(e.target.value)}
 						placeholder={PROMPT_PLACEHOLDER}
-						rows={12}
+						rows={8}
 						className="w-full resize-y rounded-lg border border-kumo-line bg-kumo-recessed px-3 py-2 text-xs text-kumo-default placeholder:text-kumo-subtle focus:outline-none focus:ring-1 focus:ring-kumo-ring font-mono leading-relaxed"
 					/>
 					<p className="text-xs text-kumo-subtle mt-2">
-						The prompt is sent as the system message to the AI model.
-						It controls the agent's personality, writing style, and behavior rules.
+						这段文字会作为系统提示发送给模型，用来控制助手的个性和回复风格。
 					</p>
 				</div>
 
 				{/* Save */}
 				<div className="flex justify-end">
 					<Button variant="primary" onClick={handleSave} loading={isSaving}>
-						Save Changes
+						保存
 					</Button>
 				</div>
 			</div>
