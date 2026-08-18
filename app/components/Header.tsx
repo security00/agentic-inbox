@@ -56,7 +56,7 @@ export default function Header() {
 	const isSettingsActive = location.pathname.includes("/settings");
 
 	return (
-		<header className="flex items-center gap-2 px-3 py-2.5 bg-kumo-base border-b border-kumo-line sticky top-0 z-10 md:px-5 md:gap-4">
+		<header className="flex items-center gap-2 px-3 py-2.5 bg-kumo-base border-b border-kumo-line sticky top-0 z-10 min-w-0 overflow-hidden md:px-5 md:gap-4">
 			{/* Hamburger menu - mobile only */}
 			<Button
 				variant="ghost"
@@ -70,15 +70,15 @@ export default function Header() {
 
 			{/* Search - full on desktop, collapsible on mobile */}
 			<div
-				className={`flex-1 max-w-lg transition-all flex items-center gap-1 ${
+				className={`flex-1 min-w-0 max-w-lg transition-all flex items-center gap-1 ${
 					isSearchExpanded ? "flex" : "hidden md:flex"
 				}`}
 			>
-				<div className="flex-1 relative flex items-center">
+				<div className="flex-1 min-w-0 relative flex items-center">
 					<Input
 						className="w-full"
 						aria-label="搜索邮件"
-						placeholder="搜索邮件…（可用 from:name、is:unread、has:attachment）"
+						placeholder="搜索邮件…"
 						value={searchQuery}
 						onChange={(e) => setSearchQuery(e.target.value)}
 						onKeyDown={handleKeyDown}
