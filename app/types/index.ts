@@ -8,6 +8,11 @@ export interface SignatureSettings {
 	html?: string;
 }
 
+export interface SignatureTemplate {
+	enabled: boolean;
+	text: string;
+}
+
 export interface MailboxSettings {
 	fromName?: string;
 	forwarding?: { enabled: boolean; email: string };

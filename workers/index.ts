@@ -20,6 +20,10 @@ import { handleReplyEmail, handleForwardEmail } from "./routes/reply-forward";
 import { Folders } from "../shared/folders";
 import type { Env } from "./types";
 import { requireMailbox, type MailboxContext } from "./lib/mailbox";
+import {
+	renderSignatureTemplate,
+	SIGNATURE_TEMPLATE_KEY,
+} from "../shared/signature-template";
 
 type AppContext = Context<MailboxContext>;
 
@@ -29,6 +33,11 @@ const CreateMailboxBody = z.object({
 	email: z.string().email(),
 	name: z.string().min(1),
 	settings: z.record(z.any()).optional(), // unvalidated — agentSystemPrompt goes straight to AI
+});
+
+const SignatureTemplateBody = z.object({
+	enabled: z.boolean(),
+	text: z.string(),
 });
 
 const DraftBody = z.object({
@@ -63,6 +72,16 @@ function boolQuery(c: AppContext, key: string): boolean | undefined {
 	return v === "true" || v === "1";
 }
 
+async function readSignatureTemplate(bucket: R2Bucket): Promise<{ enabled: boolean; text: string }> {
+	const obj = await bucket.get(SIGNATURE_TEMPLATE_KEY);
+	if (!obj) return { enabled: false, text: "" };
+	const parsed = (await obj.json()) as { enabled?: unknown; text?: unknown };
+	return {
+		enabled: parsed.enabled === true,
+		text: typeof parsed.text === "string" ? parsed.text : "",
+	};
+}
+
 // -- App & middleware -----------------------------------------------
 
 const app = new Hono<MailboxContext>();
@@ -92,6 +111,18 @@ app.get("/api/v1/config", (c) => {
 	return c.json({ domains, emailAddresses });
 });
 
+// -- Global settings ------------------------------------------------
+
+app.get("/api/v1/settings/signature-template", async (c) => {
+	return c.json(await readSignatureTemplate(c.env.BUCKET));
+});
+
+app.put("/api/v1/settings/signature-template", async (c) => {
+	const body = SignatureTemplateBody.parse(await c.req.json());
+	await c.env.BUCKET.put(SIGNATURE_TEMPLATE_KEY, JSON.stringify(body));
+	return c.json(body);
+});
+
 // -- Mailboxes ------------------------------------------------------
 
 app.get("/api/v1/mailboxes", async (c) => {
@@ -109,6 +140,13 @@ app.post("/api/v1/mailboxes", async (c) => {
 	const key = `mailboxes/${email}.json`;
 	if (await c.env.BUCKET.head(key)) return c.json({ error: "Mailbox already exists" }, 409);
 	const defaultSettings = { fromName: name, forwarding: { enabled: false, email: "" }, signature: { enabled: false, text: "" }, autoReply: { enabled: false, subject: "", message: "" } };
+	const globalTemplate = await readSignatureTemplate(c.env.BUCKET);
+	if (globalTemplate.enabled && globalTemplate.text) {
+		defaultSettings.signature = {
+			enabled: true,
+			text: renderSignatureTemplate(globalTemplate.text, { email, fromName: name, name }),
+		};
+	}
 	const finalSettings = { ...defaultSettings, ...settings };
 	await c.env.BUCKET.put(key, JSON.stringify(finalSettings));
 	const stub = c.env.MAILBOX.get(c.env.MAILBOX.idFromName(email));

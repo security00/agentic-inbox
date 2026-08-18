@@ -22,8 +22,13 @@ import {
 	useDeleteMailbox,
 	useMailboxes,
 } from "~/queries/mailboxes";
+import { useSignatureTemplate, useUpdateSignatureTemplate } from "~/queries/settings";
 import { queryKeys } from "~/queries/keys";
 import type { Mailbox } from "~/types";
+import {
+	DEFAULT_SIGNATURE_TEMPLATE_TEXT,
+	renderSignatureTemplate,
+} from "shared/signature-template";
 
 
 const PREFERRED_MAILBOX = "support@discoverkeywords.co";
@@ -69,6 +74,18 @@ export default function HomeRoute() {
 	const [isDeleting, setIsDeleting] = useState(false);
 	const [filterQuery, setFilterQuery] = useState("");
 	const [lastMailboxId, setLastMailboxId] = useState<string | null>(null);
+
+	const { data: signatureTemplate } = useSignatureTemplate();
+	const updateSignatureTemplate = useUpdateSignatureTemplate();
+	const [tplEnabled, setTplEnabled] = useState(false);
+	const [tplText, setTplText] = useState(DEFAULT_SIGNATURE_TEMPLATE_TEXT);
+	const [isSavingTpl, setIsSavingTpl] = useState(false);
+
+	useEffect(() => {
+		if (!signatureTemplate) return;
+		setTplEnabled(signatureTemplate.enabled);
+		setTplText(signatureTemplate.text || DEFAULT_SIGNATURE_TEMPLATE_TEXT);
+	}, [signatureTemplate]);
 
 	useEffect(() => {
 		try {
@@ -201,6 +218,30 @@ export default function HomeRoute() {
 		);
 	}, [accounts, filterQuery]);
 
+	const previewEmail =
+		accounts.find((a) => a.email.toLowerCase() === PREFERRED_MAILBOX.toLowerCase())?.email
+		|| accounts[0]?.email
+		|| PREFERRED_MAILBOX;
+	const previewMailbox = mailboxByEmail.get(previewEmail.toLowerCase());
+	const previewFromName = mailboxTitle(previewEmail, previewMailbox);
+	const previewSignature = renderSignatureTemplate(tplText, {
+		email: previewEmail,
+		fromName: previewFromName,
+		name: previewFromName,
+	});
+
+	const handleSaveTemplate = async () => {
+		setIsSavingTpl(true);
+		try {
+			await updateSignatureTemplate.mutateAsync({ enabled: tplEnabled, text: tplText });
+			toastManager.add({ title: "默认签名模板已保存" });
+		} catch {
+			toastManager.add({ title: "保存签名模板失败", variant: "error" });
+		} finally {
+			setIsSavingTpl(false);
+		}
+	};
+
 	const isLoading = !configData;
 
 	return (
@@ -315,6 +356,52 @@ export default function HomeRoute() {
 						</div>
 					</div>
 				)}
+
+				<div className="mt-8 rounded-xl border border-kumo-line bg-kumo-base p-5">
+					<div className="flex items-center justify-between mb-3">
+						<div className="text-sm font-medium text-kumo-default">默认签名模板</div>
+						<label className="flex items-center gap-2 text-sm text-kumo-default cursor-pointer">
+							<input
+								type="checkbox"
+								checked={tplEnabled}
+								onChange={(e) => setTplEnabled(e.target.checked)}
+							/>
+							启用
+						</label>
+					</div>
+					<p className="text-xs text-kumo-subtle mb-3">
+						写信时，未设置自定义签名的邮箱会使用此模板。新创建的邮箱也会自动套用。各邮箱已启用的自定义签名优先。
+					</p>
+					<textarea
+						value={tplText}
+						onChange={(e) => setTplText(e.target.value)}
+						placeholder={DEFAULT_SIGNATURE_TEMPLATE_TEXT}
+						rows={6}
+						disabled={!tplEnabled}
+						className="w-full resize-y rounded-lg border border-kumo-line bg-kumo-recessed px-3 py-2 text-sm text-kumo-default placeholder:text-kumo-subtle focus:outline-none focus:ring-1 focus:ring-kumo-ring disabled:opacity-60"
+					/>
+					<p className="text-xs text-kumo-subtle mt-2">
+						可用变量：{"{{email}}"}（邮箱）、{"{{domain}}"}（域名）、{"{{fromName}}"}（显示名）
+					</p>
+					{tplEnabled && tplText.trim() && (
+						<div className="mt-4">
+							<div className="text-xs font-medium text-kumo-subtle mb-1.5">
+								预览（{previewEmail}）
+							</div>
+							<pre className="whitespace-pre-wrap rounded-lg border border-kumo-line bg-kumo-recessed px-3 py-2 text-sm text-kumo-default">{previewSignature}</pre>
+						</div>
+					)}
+					<div className="flex justify-end mt-4">
+						<Button
+							variant="primary"
+							size="sm"
+							onClick={handleSaveTemplate}
+							loading={isSavingTpl}
+						>
+							保存
+						</Button>
+					</div>
+				</div>
 			</div>
 
 			{/* Create Dialog */}
