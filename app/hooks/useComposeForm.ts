@@ -16,6 +16,7 @@ import {
 } from "~/lib/utils";
 import { useDeleteEmail, useForwardEmail, useReplyToEmail, useSaveDraft, useSendEmail } from "~/queries/emails";
 import { useMailbox } from "~/queries/mailboxes";
+import { useSignatureTemplate } from "~/queries/settings";
 import { useUIStore } from "~/hooks/useUIStore";
 
 function appendUniqueAddress(
@@ -166,6 +167,7 @@ export function useComposeForm(mailboxId?: string, _folder?: string) {
 	const toastManager = useKumoToastManager();
 	const { composeOptions, closePanel, closeCompose } = useUIStore();
 	const { data: currentMailbox } = useMailbox(mailboxId);
+	const { data: signatureTemplate, isFetched: templateFetched } = useSignatureTemplate();
 	const sendEmailMutation = useSendEmail();
 	const saveDraftMutation = useSaveDraft();
 	const replyMutation = useReplyToEmail();
@@ -189,9 +191,13 @@ export function useComposeForm(mailboxId?: string, _folder?: string) {
 		switch (composeOptions.mode) { case "reply": return "回复"; case "reply-all": return "回复全部"; case "forward": return "转发"; default: return "新邮件"; }
 	}, [composeOptions.mode, isDraftEdit]);
 
-	const sigBlock = useMemo(() => getSignatureBlock(currentMailbox?.settings), [currentMailbox]);
+	const sigBlock = useMemo(
+		() => getSignatureBlock(currentMailbox?.settings, signatureTemplate, currentMailbox),
+		[currentMailbox, signatureTemplate],
+	);
 
 	useEffect(() => {
+		if (!templateFetched) return;
 		if (lastInitializedOptionsRef.current === composeOptions) return;
 		lastInitializedOptionsRef.current = composeOptions;
 
@@ -207,7 +213,7 @@ export function useComposeForm(mailboxId?: string, _folder?: string) {
 		setShowCcBcc(initialFields.showCcBcc);
 		setSubject(initialFields.subject);
 		setBody(initialFields.body);
-	}, [composeOptions, currentMailbox?.email, sigBlock]);
+	}, [composeOptions, currentMailbox?.email, sigBlock, templateFetched]);
 
 	const handleSaveDraft = async () => {
 		if (!mailboxId || isSending) return; setIsSavingDraft(true); setError(null);
