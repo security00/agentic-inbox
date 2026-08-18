@@ -77,7 +77,7 @@ const KumoLink = forwardRef<
 
 export function Layout({ children }: { children: React.ReactNode }) {
 	return (
-		<html lang="zh-CN">
+		<html lang="zh-CN" dir="ltr">
 			<head>
 				<meta charSet="UTF-8" />
 				<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
@@ -92,7 +92,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
 				<Meta />
 				<Links />
 			</head>
-			<body className="bg-kumo-recessed text-kumo-default antialiased">
+			<body className="bg-kumo-recessed text-kumo-default antialiased overflow-x-hidden">
 				{children}
 				<ScrollRestoration />
 				<Scripts />

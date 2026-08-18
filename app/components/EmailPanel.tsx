@@ -140,7 +140,7 @@ export default function EmailPanel({ emailId }: { emailId: string }) {
 	const hasThread = allMessages.length > 1;
 
 	return (
-		<div className="flex flex-col h-full">
+		<div className="flex flex-col h-full min-w-0 overflow-hidden">
 			<EmailPanelToolbar
 				email={email}
 				mailboxId={mailboxId}

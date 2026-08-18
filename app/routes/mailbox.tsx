@@ -63,7 +63,7 @@ export default function MailboxRoute() {
 	}, [selectedEmailId, closeAgentPanel]);
 
 	return (
-		<div className="flex h-screen overflow-hidden">
+		<div className="flex h-screen min-w-0 overflow-hidden">
 			{/* Mobile sidebar overlay backdrop */}
 			{isSidebarOpen && (
 				<div
@@ -78,7 +78,7 @@ export default function MailboxRoute() {
 
 			{/* Sidebar: hidden on mobile by default, shown as overlay when open */}
 			<div
-				className={`fixed inset-y-0 left-0 z-40 w-64 transform transition-transform duration-200 ease-in-out md:relative md:translate-x-0 md:z-0 ${
+				className={`fixed inset-y-0 left-0 z-40 w-64 shrink-0 transform transition-transform duration-200 ease-in-out md:relative md:translate-x-0 md:z-0 ${
 					isSidebarOpen ? "translate-x-0" : "-translate-x-full"
 				}`}
 			>
@@ -86,9 +86,9 @@ export default function MailboxRoute() {
 			</div>
 
 			{/* Main content */}
-			<div className="flex-1 flex flex-col min-w-0 bg-kumo-base">
+			<div className="flex-1 flex flex-col min-w-0 overflow-hidden bg-kumo-base">
 				<Header />
-				<main className="flex-1 overflow-hidden">
+				<main className="flex-1 min-w-0 overflow-hidden">
 					<Outlet />
 				</main>
 			</div>

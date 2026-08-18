@@ -283,8 +283,8 @@ export default function EmailListRoute() {
 			isComposing={isComposing}
 		>
 				{/* Folder header */}
-				<div className="flex items-center justify-between px-4 py-3.5 border-b border-kumo-line shrink-0 md:px-5">
-					<h1 className="text-lg font-semibold text-kumo-default">
+				<div className="flex items-center justify-between gap-3 px-4 py-3.5 border-b border-kumo-line shrink-0 min-w-0 md:px-5">
+					<h1 className="text-lg font-semibold text-kumo-default truncate min-w-0">
 						{folderName}
 					</h1>
 					<div className="flex items-center gap-1">
@@ -317,7 +317,7 @@ export default function EmailListRoute() {
 				</div>
 
 				{/* Email rows */}
-				<div className="flex-1 overflow-y-auto">
+				<div className="flex-1 min-w-0 overflow-y-auto overflow-x-hidden">
 				{isRefreshing && emails.length === 0 ? (
 					<EmailListSkeleton />
 				) : emails.length > 0 ? (
@@ -337,7 +337,7 @@ export default function EmailListRoute() {
 												handleRowClick(email);
 											}
 										}}
-										className={`group flex items-center gap-3 w-full text-left cursor-pointer transition-colors border-b border-kumo-line px-4 py-2.5 md:px-6 md:py-3 ${
+										className={`group flex items-center gap-3 w-full min-w-0 overflow-hidden text-left cursor-pointer transition-colors border-b border-kumo-line px-4 py-2.5 md:px-6 md:py-3 ${
 											isPanelOpen ? "md:px-4 md:py-2.5" : ""
 										} ${isSelected ? "bg-kumo-tint" : "hover:bg-kumo-tint"}`}
 									>
@@ -368,11 +368,19 @@ export default function EmailListRoute() {
 											/>
 										</button>
 
-										{/* Content */}
-										<div className="min-w-0 flex-1">
-											<div className="flex items-center gap-2">
+										{/* Content: stacked on narrow/split, one line on wide screens */}
+										<div
+											className={`min-w-0 flex-1 overflow-hidden ${
+												isPanelOpen ? "" : "lg:flex lg:items-center lg:gap-3"
+											}`}
+										>
+											<div
+												className={`flex items-center gap-2 min-w-0 ${
+													isPanelOpen ? "" : "lg:w-44 lg:shrink-0"
+												}`}
+											>
 												<span
-													className={`truncate text-sm ${hasUnread(email) ? "font-semibold text-kumo-default" : "text-kumo-strong"}`}
+													className={`truncate min-w-0 text-sm ${hasUnread(email) ? "font-semibold text-kumo-default" : "text-kumo-strong"}`}
 												>
 													{formatParticipants(email)}
 												</span>
@@ -393,11 +401,15 @@ export default function EmailListRoute() {
 														</span>
 													</Tooltip>
 												)}
-												<span className="text-sm text-kumo-subtle shrink-0 ml-auto">
+												<span
+													className={`text-sm text-kumo-subtle shrink-0 ${
+														isPanelOpen ? "ml-auto" : "ml-auto lg:hidden"
+													}`}
+												>
 													{formatListDate(email.date)}
 												</span>
 											</div>
-											<div className="truncate text-sm mt-0.5">
+											<div className="min-w-0 flex-1 truncate text-sm mt-0.5 lg:mt-0">
 												<span
 													className={hasUnread(email) ? "font-medium text-kumo-default" : "text-kumo-subtle"}
 												>
@@ -409,6 +421,11 @@ export default function EmailListRoute() {
 												</span>
 											)}
 										</div>
+											{!isPanelOpen && (
+												<span className="hidden lg:inline text-sm text-kumo-subtle shrink-0">
+													{formatListDate(email.date)}
+												</span>
+											)}
 									</div>
 
 										{/* Hover actions */}
