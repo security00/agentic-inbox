@@ -23,3 +23,21 @@ export function useUpdateSignatureTemplate() {
 		},
 	});
 }
+
+export function useAddDomain() {
+	const qc = useQueryClient();
+	return useMutation({
+		mutationFn: (domain: string) => api.addDomain(domain),
+		onSuccess: (data) => {
+			qc.setQueryData(
+				queryKeys.config,
+				(old: { domains?: string[]; emailAddresses?: string[] } | undefined) =>
+					old
+						? { ...old, domains: data.domains }
+						: { domains: data.domains, emailAddresses: [] },
+			);
+			qc.invalidateQueries({ queryKey: queryKeys.config });
+		},
+	});
+}
+

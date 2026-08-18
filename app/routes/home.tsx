@@ -12,7 +12,7 @@ import {
 	Text,
 	useKumoToastManager,
 } from "@cloudflare/kumo";
-import { EnvelopeIcon, PlusIcon, TrashIcon } from "@phosphor-icons/react";
+import { EnvelopeIcon, GlobeIcon, PlusIcon, TrashIcon } from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
 import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { Link as RouterLink } from "react-router";
@@ -22,7 +22,7 @@ import {
 	useDeleteMailbox,
 	useMailboxes,
 } from "~/queries/mailboxes";
-import { useSignatureTemplate, useUpdateSignatureTemplate } from "~/queries/settings";
+import { useAddDomain, useSignatureTemplate, useUpdateSignatureTemplate } from "~/queries/settings";
 import { queryKeys } from "~/queries/keys";
 import type { Mailbox } from "~/types";
 import {
@@ -80,6 +80,12 @@ export default function HomeRoute() {
 	const [tplEnabled, setTplEnabled] = useState(false);
 	const [tplText, setTplText] = useState(DEFAULT_SIGNATURE_TEMPLATE_TEXT);
 	const [isSavingTpl, setIsSavingTpl] = useState(false);
+	const addDomain = useAddDomain();
+	const [isConnectOpen, setIsConnectOpen] = useState(false);
+	const [newDomain, setNewDomain] = useState("");
+	const [connectError, setConnectError] = useState<string | null>(null);
+	const [isConnecting, setIsConnecting] = useState(false);
+	const [connectDone, setConnectDone] = useState(false);
 
 	useEffect(() => {
 		if (!signatureTemplate) return;
@@ -127,6 +133,31 @@ export default function HomeRoute() {
 		).then(() => { if (!cancelled) refetchMailboxes(); });
 		return () => { cancelled = true; };
 	}, [emailAddresses, mailboxes, refetchMailboxes]);
+
+	const handleConnect = async (e: FormEvent) => {
+		e.preventDefault();
+		setConnectError(null);
+		const domain = newDomain.trim();
+		if (!domain) {
+			setConnectError("请填写域名");
+			return;
+		}
+		setIsConnecting(true);
+		try {
+			const result = await addDomain.mutateAsync(domain);
+			const next = (result.domains || []).find((d) =>
+				d === domain.toLowerCase().replace(/^https?:\/\//, "").replace(/\/.*$/, ""),
+			) || result.domains?.[result.domains.length - 1] || domain.toLowerCase();
+			setSelectedDomain(next);
+			setConnectDone(true);
+			toastManager.add({ title: "域名已接入" });
+		} catch (err: unknown) {
+			const message = (err instanceof Error ? err.message : null) || "接入失败";
+			setConnectError(message);
+		} finally {
+			setIsConnecting(false);
+		}
+	};
 
 	const handleCreate = async (e: FormEvent) => {
 		e.preventDefault();
@@ -177,20 +208,11 @@ export default function HomeRoute() {
 	}, [mailboxes]);
 
 	const accounts = useMemo(() => {
-		const raw = isConfigured
-			? emailAddresses.map((addr) => {
-					const mailbox = mailboxByEmail.get(addr.toLowerCase());
-					return {
-						id: addr,
-						email: addr,
-						name: mailboxTitle(addr, mailbox),
-					};
-				})
-			: mailboxes.map((mailbox) => ({
-					id: mailbox.id,
-					email: mailbox.email,
-					name: mailboxTitle(mailbox.email, mailbox),
-				}));
+		const raw = mailboxes.map((mailbox) => ({
+			id: mailbox.id,
+			email: mailbox.email,
+			name: mailboxTitle(mailbox.email, mailbox),
+		}));
 		const preferred = PREFERRED_MAILBOX.toLowerCase();
 		const last = lastMailboxId?.toLowerCase() || "";
 		return [...raw].sort((a, b) => {
@@ -206,7 +228,7 @@ export default function HomeRoute() {
 			if (diff !== 0) return diff;
 			return ae.localeCompare(be);
 		});
-	}, [isConfigured, emailAddresses, mailboxes, mailboxByEmail, lastMailboxId]);
+	}, [mailboxes, lastMailboxId]);
 
 	const visibleAccounts = useMemo(() => {
 		const q = filterQuery.trim().toLowerCase();
@@ -248,9 +270,20 @@ export default function HomeRoute() {
 		<div className="min-h-screen bg-kumo-recessed">
 			<div className="mx-auto max-w-2xl px-4 py-8 md:px-6 md:py-16">
 				<div className="mb-8">
-					<div className="flex items-center justify-between">
+					<div className="flex items-center justify-between gap-3">
 						<h1 className="text-2xl font-bold text-kumo-default">邮箱</h1>
-						{!isConfigured && (
+						<div className="flex items-center gap-2">
+							<Button
+								variant="secondary"
+								icon={<GlobeIcon size={16} />}
+								onClick={() => {
+									setConnectError(null);
+									setConnectDone(false);
+									setIsConnectOpen(true);
+								}}
+							>
+								接入域名
+							</Button>
 							<Button
 								variant="primary"
 								icon={<PlusIcon size={16} />}
@@ -258,7 +291,7 @@ export default function HomeRoute() {
 							>
 								新建邮箱
 							</Button>
-						)}
+						</div>
 					</div>
 					{domains.length > 0 && (
 						<p className="text-sm text-kumo-subtle mt-1">
@@ -303,24 +336,22 @@ export default function HomeRoute() {
 										{account.email}
 									</div>
 								</div>
-								{!isConfigured && (
-									<Button
-										variant="ghost"
-										size="sm"
-										shape="square"
-										icon={<TrashIcon size={16} />}
-										aria-label={`删除邮箱 ${account.email}`}
-										onClick={(e) => {
-											e.preventDefault();
-											e.stopPropagation();
-											setMailboxToDelete({
-												id: account.id,
-												email: account.email,
-											});
-											setIsDeleteOpen(true);
-										}}
-									/>
-								)}
+								<Button
+									variant="ghost"
+									size="sm"
+									shape="square"
+									icon={<TrashIcon size={16} />}
+									aria-label={`删除邮箱 ${account.email}`}
+									onClick={(e) => {
+										e.preventDefault();
+										e.stopPropagation();
+										setMailboxToDelete({
+											id: account.id,
+											email: account.email,
+										});
+										setIsDeleteOpen(true);
+									}}
+								/>
 							</RouterLink>
 						))}
 					</div>
@@ -340,18 +371,29 @@ export default function HomeRoute() {
 							<p className="text-sm text-kumo-subtle max-w-sm mb-5">
 								{accounts.length > 0
 									? "换个关键词试试，例如域名或显示名。"
-									: isConfigured
-										? "邮件路由已配置，邮箱创建后会自动出现在这里。"
-										: "创建一个邮箱，开始用你的域名收发邮件。"}
+									: "先接入域名，再新建邮箱，就能用自己的域名收发。"}
 							</p>
-							{!isConfigured && (
-								<Button
-									variant="primary"
-									icon={<PlusIcon size={16} />}
-									onClick={() => setIsCreateOpen(true)}
-								>
-									创建邮箱
-								</Button>
+							{accounts.length === 0 && (
+								<div className="flex items-center gap-2">
+									<Button
+										variant="secondary"
+										icon={<GlobeIcon size={16} />}
+										onClick={() => {
+											setConnectError(null);
+											setConnectDone(false);
+											setIsConnectOpen(true);
+										}}
+									>
+										接入域名
+									</Button>
+									<Button
+										variant="primary"
+										icon={<PlusIcon size={16} />}
+										onClick={() => setIsCreateOpen(true)}
+									>
+										创建邮箱
+									</Button>
+								</div>
 							)}
 						</div>
 					</div>
@@ -404,6 +446,81 @@ export default function HomeRoute() {
 				</div>
 			</div>
 
+			{/* Connect domain Dialog */}
+			<Dialog.Root
+				open={isConnectOpen}
+				onOpenChange={(open) => {
+					setIsConnectOpen(open);
+					if (!open) {
+						setConnectError(null);
+						setConnectDone(false);
+					}
+				}}
+			>
+				<Dialog size="sm" className="p-6">
+					<Dialog.Title className="text-base font-semibold mb-2">
+						接入域名
+					</Dialog.Title>
+					<p className="text-sm text-kumo-subtle mb-4">
+						不用改配置、不用重新发布。填域名，再在 Cloudflare 点两下邮件路由。
+					</p>
+					<form onSubmit={handleConnect} className="space-y-4">
+						{connectError && (
+							<Text variant="error" size="sm">
+								{connectError}
+							</Text>
+						)}
+						<Input
+							label="域名"
+							placeholder="example.com"
+							size="sm"
+							value={newDomain}
+							onChange={(e) => setNewDomain(e.target.value)}
+							required
+						/>
+						<ol className="text-sm text-kumo-default space-y-2 list-decimal pl-5">
+							<li>Cloudflare 打开该域名 → Email → Email Routing → 启用（会自动加 MX）</li>
+							<li>Routing rules → Catch-all → Send to a Worker → 选 agentic-inbox</li>
+							<li>回到本页点「新建邮箱」，建 support@该域名（或任意前缀）</li>
+						</ol>
+						<p className="text-xs text-kumo-subtle">
+							第一次往 Gmail 发信可能进垃圾箱。稳定后再给该域加 SPF / DKIM / DMARC。
+						</p>
+						<div className="flex justify-end gap-2 pt-1">
+							<Dialog.Close
+								render={(props) => (
+									<Button {...props} variant="secondary" size="sm">
+										取消
+									</Button>
+								)}
+							/>
+							{connectDone ? (
+								<Button
+									type="button"
+									variant="primary"
+									size="sm"
+									onClick={() => {
+										setIsConnectOpen(false);
+										setIsCreateOpen(true);
+									}}
+								>
+									去新建邮箱
+								</Button>
+							) : (
+								<Button
+									type="submit"
+									variant="primary"
+									size="sm"
+									loading={isConnecting}
+								>
+									接入
+								</Button>
+							)}
+						</div>
+					</form>
+				</Dialog>
+			</Dialog.Root>
+
 			{/* Create Dialog */}
 			<Dialog.Root open={isCreateOpen} onOpenChange={setIsCreateOpen}>
 				<Dialog size="sm" className="p-6">
@@ -414,6 +531,11 @@ export default function HomeRoute() {
 						{createError && (
 							<Text variant="error" size="sm">
 								{createError}
+							</Text>
+						)}
+						{domains.length === 0 && (
+							<Text size="sm">
+								还没有域名。先点「接入域名」，再来新建。
 							</Text>
 						)}
 						<div>
