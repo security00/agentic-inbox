@@ -267,7 +267,7 @@ export default function HomeRoute() {
 	const isLoading = !configData;
 
 	return (
-		<div className="min-h-screen bg-kumo-recessed">
+		<div className="min-h-full bg-kumo-recessed overflow-y-auto">
 			<div className="mx-auto max-w-2xl px-4 py-8 md:px-6 md:py-16">
 				<div className="mb-8">
 					<div className="flex items-center justify-between gap-3">
@@ -295,7 +295,7 @@ export default function HomeRoute() {
 					</div>
 					{domains.length > 0 && (
 						<p className="text-sm text-kumo-subtle mt-1">
-							{domains.join(", ")}
+							已接入 {domains.length} 个域名
 						</p>
 					)}
 				</div>
