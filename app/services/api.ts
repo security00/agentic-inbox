@@ -104,6 +104,8 @@ const api = {
 		get<SignatureTemplate>("/api/v1/settings/signature-template"),
 	updateSignatureTemplate: (data: SignatureTemplate) =>
 		put<SignatureTemplate>("/api/v1/settings/signature-template", data),
+	addDomain: (domain: string) =>
+		post<{ domains: string[] }>("/api/v1/settings/domains", { domain }),
 
 	// Mailboxes
 	listMailboxes: () => get<Mailbox[]>("/api/v1/mailboxes"),
