@@ -64,7 +64,7 @@ export default function Header() {
 				size="sm"
 				icon={<ListIcon size={20} />}
 				onClick={toggleSidebar}
-				aria-label="Toggle sidebar"
+				aria-label="打开或关闭侧栏"
 				className="md:hidden shrink-0"
 			/>
 
@@ -77,8 +77,8 @@ export default function Header() {
 				<div className="flex-1 relative flex items-center">
 					<Input
 						className="w-full"
-						aria-label="Search emails"
-						placeholder="Search emails... (try from:name, is:unread, has:attachment)"
+						aria-label="搜索邮件"
+						placeholder="搜索邮件…（可用 from:name、is:unread、has:attachment）"
 						value={searchQuery}
 						onChange={(e) => setSearchQuery(e.target.value)}
 						onKeyDown={handleKeyDown}
@@ -88,19 +88,19 @@ export default function Header() {
 							type="button"
 							onClick={clearSearch}
 							className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded text-kumo-subtle hover:text-kumo-default hover:bg-kumo-tint transition-colors"
-							aria-label="Clear search"
+							aria-label="清除搜索"
 						>
 							<XIcon size={14} />
 						</button>
 					)}
 				</div>
-				<Tooltip content="Search" side="bottom" asChild>
+				<Tooltip content="搜索" side="bottom" asChild>
 					<Button
 						variant="ghost"
 						shape="square"
 						icon={<MagnifyingGlassIcon size={20} />}
 						onClick={performSearch}
-						aria-label="Search"
+						aria-label="搜索"
 					/>
 				</Tooltip>
 			</div>
@@ -113,23 +113,23 @@ export default function Header() {
 					size="sm"
 					icon={<MagnifyingGlassIcon size={20} />}
 					onClick={() => setIsSearchExpanded(true)}
-					aria-label="Search"
+					aria-label="搜索"
 					className="md:hidden shrink-0"
 				/>
 			)}
 
 			<div className="flex items-center gap-1 ml-auto shrink-0">
-				<Tooltip content={isAgentPanelOpen ? "Hide agent panel" : "Show agent panel"} side="bottom" asChild>
+				<Tooltip content={isAgentPanelOpen ? "隐藏助手面板" : "显示助手面板"} side="bottom" asChild>
 					<Button
 						variant={isAgentPanelOpen ? "secondary" : "ghost"}
 						shape="square"
 						icon={<RobotIcon size={20} />}
 						onClick={toggleAgentPanel}
-						aria-label="Toggle agent panel"
+						aria-label="打开或关闭助手面板"
 						className="hidden lg:inline-flex"
 					/>
 				</Tooltip>
-				<Tooltip content="Settings" side="bottom" asChild>
+				<Tooltip content="设置" side="bottom" asChild>
 					<Button
 						variant={isSettingsActive ? "secondary" : "ghost"}
 						shape="square"
@@ -141,7 +141,7 @@ export default function Header() {
 									: `/mailbox/${mailboxId}/settings`,
 							)
 						}
-						aria-label="Settings"
+						aria-label="设置"
 					/>
 				</Tooltip>
 			</div>
