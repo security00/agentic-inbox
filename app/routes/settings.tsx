@@ -106,6 +106,9 @@ export default function SettingsRoute() {
 							启用签名
 						</label>
 					</div>
+					<p className="text-xs text-kumo-subtle mb-3">
+						未启用或签名为空时，写信会使用首页的默认签名模板。
+					</p>
 					<textarea
 						value={signatureText}
 						onChange={(e) => setSignatureText(e.target.value)}
