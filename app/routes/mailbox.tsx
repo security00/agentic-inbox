@@ -20,6 +20,8 @@ export default function MailboxRoute() {
 		isSidebarOpen,
 		closeSidebar,
 		isAgentPanelOpen,
+		closeAgentPanel,
+		selectedEmailId,
 		closePanel,
 		closeComposeModal,
 	} = useUIStore();
@@ -38,6 +40,28 @@ export default function MailboxRoute() {
 		prevMailboxIdRef.current = mailboxId;
 	}, [mailboxId, closeComposeModal, closePanel, closeSidebar]);
 
+	useEffect(() => {
+		if (!mailboxId) return;
+		try {
+			localStorage.setItem("inbox:lastMailboxId", mailboxId);
+		} catch {
+			// ignore quota / private mode
+		}
+	}, [mailboxId]);
+
+	useEffect(() => {
+		const collapseIfNeeded = () => {
+			if (window.innerWidth < 1280) closeAgentPanel();
+		};
+		collapseIfNeeded();
+		window.addEventListener("resize", collapseIfNeeded);
+		return () => window.removeEventListener("resize", collapseIfNeeded);
+	}, [closeAgentPanel]);
+
+	useEffect(() => {
+		if (selectedEmailId) closeAgentPanel();
+	}, [selectedEmailId, closeAgentPanel]);
+
 	return (
 		<div className="flex h-screen overflow-hidden">
 			{/* Mobile sidebar overlay backdrop */}
@@ -48,7 +72,7 @@ export default function MailboxRoute() {
 					onKeyDown={(e) => e.key === "Escape" && closeSidebar()}
 					role="button"
 					tabIndex={-1}
-					aria-label="Close sidebar"
+					aria-label="关闭侧栏"
 				/>
 			)}
 
