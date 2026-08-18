@@ -18,7 +18,7 @@ function LazyAgentPanel() {
 			setAgentChat(() => mod.default);
 		}).catch((err) => {
 			console.error("Failed to load AgentPanel:", err);
-			setLoadError("Failed to load agent panel");
+			setLoadError("助手面板加载失败");
 		});
 	}, []);
 
@@ -33,7 +33,7 @@ function LazyAgentPanel() {
 		return (
 			<div className="flex flex-col items-center justify-center h-full gap-2">
 				<Loader size="base" />
-				<span className="text-xs text-kumo-subtle">Loading agent...</span>
+				<span className="text-xs text-kumo-subtle">正在加载助手…</span>
 			</div>
 		);
 	}
@@ -57,7 +57,7 @@ export default function AgentSidebar() {
 					}`}
 				>
 					<RobotIcon size={14} weight={activeTab === "agent" ? "fill" : "regular"} />
-					Agent
+					助手
 				</button>
 				<button
 					type="button"
