@@ -63,7 +63,7 @@ export default function MailboxRoute() {
 	}, [selectedEmailId, closeAgentPanel]);
 
 	return (
-		<div className="flex h-screen min-w-0 overflow-hidden">
+		<div className="flex h-screen w-full max-w-full min-w-0 overflow-hidden">
 			{/* Mobile sidebar overlay backdrop */}
 			{isSidebarOpen && (
 				<div
