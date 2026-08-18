@@ -2,9 +2,13 @@
 @import "@cloudflare/kumo/styles/tailwind";
 @import "tailwindcss";
 
+html,
 body {
   margin: 0;
+  max-width: 100%;
+  overflow-x: hidden;
 }
+
 
 /* TipTap list styles */
 .ProseMirror ul {
