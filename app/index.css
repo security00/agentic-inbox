@@ -32,7 +32,7 @@ body {
 }
 
 
-/* Split list + reading pane. Plain CSS so Windows/Tailwind arbitrary grid values cannot fail. */
+/* Split list + reading pane. Flex + fixed list width so Windows zoom cannot crush the list. */
 .mailbox-split {
   display: flex;
   height: 100%;
@@ -45,24 +45,22 @@ body {
   flex: 1 1 auto;
   min-width: 0;
 }
-.mailbox-split.is-open {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-}
 .mailbox-split.is-open .mailbox-split-list {
   display: none;
 }
 .mailbox-split-read {
+  flex: 1 1 0%;
   min-width: 0;
   max-width: 100%;
   overflow: hidden;
 }
-@media (min-width: 768px) {
-  .mailbox-split.is-open {
-    grid-template-columns: minmax(16rem, 20rem) minmax(0, 1fr);
-  }
+@media (min-width: 640px) {
   .mailbox-split.is-open .mailbox-split-list {
     display: flex;
+    flex: 0 0 18rem;
+    width: 18rem;
+    min-width: 18rem !important;
+    max-width: 18rem;
     border-right: 1px solid var(--color-kumo-line, #e5e5e5);
   }
 }

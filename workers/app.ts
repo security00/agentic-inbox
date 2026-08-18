@@ -110,10 +110,15 @@ app.all("/agents/*", async (c) => {
 });
 
 // React Router catch-all: serves the SPA for all non-API routes
-app.all("*", (c) => {
-	return requestHandler(c.req.raw, {
+app.all("*", async (c) => {
+	const res = await requestHandler(c.req.raw, {
 		cloudflare: { env: c.env, ctx: c.executionCtx as ExecutionContext },
 	});
+	const contentType = res.headers.get("content-type") || "";
+	if (!contentType.includes("text/html")) return res;
+	const headers = new Headers(res.headers);
+	headers.set("Cache-Control", "no-store, no-cache, must-revalidate");
+	return new Response(res.body, { status: res.status, statusText: res.statusText, headers });
 });
 
 // Export the Hono app as the default export with an email handler
