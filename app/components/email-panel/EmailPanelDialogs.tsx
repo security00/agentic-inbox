@@ -73,7 +73,7 @@ export default function EmailPanelDialogs({
 			>
 				<Dialog size="lg">
 					<Dialog.Title>
-						Email Source Headers
+						邮件头
 						{sourceViewEmail && (
 							<span className="text-sm font-normal text-kumo-subtle ml-2">
 								{sourceViewEmail.subject}
@@ -101,7 +101,7 @@ export default function EmailPanelDialogs({
 							</table>
 							{sourceHeaders.length === 0 && (
 								<p className="text-sm text-kumo-subtle text-center py-8">
-									No header data available for this email.
+									这封邮件没有可显示的头信息。
 								</p>
 							)}
 						</div>
@@ -109,7 +109,7 @@ export default function EmailPanelDialogs({
 					<div className="flex justify-end mt-4">
 						<Dialog.Close>
 							<Button variant="secondary" size="sm">
-								Close
+								关闭
 							</Button>
 						</Dialog.Close>
 					</div>
@@ -143,11 +143,11 @@ export default function EmailPanelDialogs({
 								}
 							}}
 						>
-							Download Original
+							下载原图
 						</Button>
 						<Dialog.Close>
 							<Button variant="primary" size="sm">
-								Close
+								关闭
 							</Button>
 						</Dialog.Close>
 					</div>
