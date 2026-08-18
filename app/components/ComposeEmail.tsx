@@ -34,6 +34,8 @@ export default function ComposeEmail() {
 		isSavingDraft,
 		isSending,
 		formTitle,
+		sendAsName,
+		sendAsEmail,
 		handleSaveDraft,
 		handleSend,
 	} = useComposeForm(mailboxId, folder);
@@ -49,10 +51,15 @@ export default function ComposeEmail() {
 				</Dialog.Title>
 				<form onSubmit={(e) => handleSend(e, closeComposeModal)} className="space-y-4">
 					{error && <Banner variant="error" text={error} />}
+					{sendAsEmail && (
+						<div className="text-sm text-kumo-subtle">
+							发件人：{sendAsName && sendAsName !== sendAsEmail ? `${sendAsName} <${sendAsEmail}>` : sendAsEmail}
+						</div>
+					)}
 					<div className="flex items-center gap-2">
 						<div className="flex-1">
 							<Input
-								label="To"
+								label="收件人"
 								type="text"
 								placeholder="recipient@example.com, another@example.com"
 								size="sm"
@@ -78,7 +85,7 @@ export default function ComposeEmail() {
 							size="sm"
 							value={cc}
 							onChange={(e) => setCc(e.target.value)}
-							placeholder="Separate multiple addresses with commas"
+							placeholder="多个地址用逗号分隔"
 						/>
 					)}
 					{showCcBcc && (
@@ -88,13 +95,13 @@ export default function ComposeEmail() {
 							size="sm"
 							value={bcc}
 							onChange={(e) => setBcc(e.target.value)}
-							placeholder="Separate multiple addresses with commas"
+							placeholder="多个地址用逗号分隔"
 						/>
 					)}
 					<Input
-						label="Subject"
+						label="主题"
 						type="text"
-						placeholder="Email subject"
+						placeholder="邮件主题"
 						size="sm"
 						value={subject}
 						onChange={(e) => setSubject(e.target.value)}
@@ -102,7 +109,7 @@ export default function ComposeEmail() {
 					/>
 					<div>
 						<Text size="sm" DANGEROUS_className="font-medium mb-1.5 block">
-							Message
+							正文
 						</Text>
 						<RichTextEditor value={body} onChange={setBody} />
 					</div>
@@ -114,7 +121,7 @@ export default function ComposeEmail() {
 							onClick={closeComposeModal}
 							disabled={isSending}
 						>
-							Discard
+							丢弃
 						</Button>
 						<div className="flex items-center gap-2">
 							<Button
@@ -126,7 +133,7 @@ export default function ComposeEmail() {
 								icon={<FloppyDiskIcon size={14} />}
 								onClick={handleSaveDraft}
 							>
-								{isSavingDraft ? "Saving..." : "Save as Draft"}
+								{isSavingDraft ? "保存中…" : "存草稿"}
 							</Button>
 							<Button
 								type="submit"
@@ -136,7 +143,7 @@ export default function ComposeEmail() {
 								disabled={isSavingDraft || isSending}
 								icon={<PaperPlaneTiltIcon size={14} />}
 							>
-								{isSending ? "Sending..." : "Send"}
+								{isSending ? "发送中…" : "发送"}
 							</Button>
 						</div>
 					</div>
