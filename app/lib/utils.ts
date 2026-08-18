@@ -11,6 +11,7 @@
 import DOMPurify from "dompurify";
 import { formatQuotedDate } from "shared/dates";
 import type { Attachment } from "~/types";
+import { renderSignatureTemplate } from "shared/signature-template";
 
 export {
 	formatListDate,
@@ -131,21 +132,42 @@ export function escapeHtml(text: string): string {
 
 /**
  * Generate the HTML signature block for compose forms.
+ * Per-mailbox signature wins when enabled with text/html.
+ * Otherwise the optional global template is rendered with mailbox placeholders.
  */
-export function getSignatureBlock(settings?: {
-	signature?: { enabled: boolean; text?: string; html?: string };
-}): string {
+export function getSignatureBlock(
+	settings?: {
+		signature?: { enabled: boolean; text?: string; html?: string };
+		fromName?: string;
+	},
+	fallback?: { enabled?: boolean; text?: string } | null,
+	mailbox?: { email?: string; name?: string; settings?: { fromName?: string } },
+): string {
 	const sig = settings?.signature;
-	if (sig?.enabled && (sig?.html || sig?.text)) {
-		// Sanitize HTML signatures with DOMPurify to allow safe formatting
-		// (bold, italic, links, etc.) while stripping scripts and event handlers.
-		// Text signatures are HTML-escaped since they have no formatting.
-		const content = sig.html
-			? DOMPurify.sanitize(sig.html)
-			: escapeHtml(sig.text || "");
-		return `<div style="border-top: 1px solid #ccc; margin-top: 16px; padding-top: 12px;">${content}</div>`;
+	const ctx = {
+		email: mailbox?.email || "",
+		fromName: mailbox?.settings?.fromName || settings?.fromName || mailbox?.name || "",
+		name: mailbox?.name || "",
+	};
+
+	let html: string | undefined;
+	let text = "";
+	if (sig?.enabled && (sig.html || sig.text)) {
+		html = sig.html;
+		text = sig.text || "";
+	} else if (fallback?.enabled && fallback.text) {
+		text = fallback.text;
+	} else {
+		return "";
 	}
-	return "";
+
+	// Sanitize HTML signatures with DOMPurify to allow safe formatting
+	// (bold, italic, links, etc.) while stripping scripts and event handlers.
+	// Text signatures are HTML-escaped since they have no formatting.
+	const content = html
+		? DOMPurify.sanitize(html)
+		: escapeHtml(renderSignatureTemplate(text, ctx)).replace(/\n/g, "<br>");
+	return `<div style="border-top: 1px solid #ccc; margin-top: 16px; padding-top: 12px;">${content}</div>`;
 }
 
 /**
