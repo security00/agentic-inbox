@@ -98,6 +98,9 @@ html {
 	background: #ffffff;
 	color-scheme: light;
 }
+html, body {
+	max-width: 100%;
+}
 body {
 	font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 	font-size: 14px;
@@ -107,14 +110,14 @@ body {
 	padding: ${padding};
 	margin: 0;
 	word-wrap: break-word;
-	overflow-wrap: break-word;
-	${autoSize ? "overflow: hidden;" : ""}
+	overflow-wrap: anywhere;
+	${autoSize ? "overflow: hidden;" : "overflow-x: auto;"}
 }
 [style*="position: fixed"], [style*="position:fixed"], [style*="position: absolute"], [style*="position:absolute"] {
 	position: relative !important;
 }
 a { color: #2563eb; }
-img { max-width: 100%; height: auto; }
+img, video { max-width: 100% !important; height: auto !important; }
 blockquote {
 	border-left: 3px solid #d1d5db;
 	padding-left: 1em;
@@ -128,7 +131,8 @@ pre {
 	overflow-x: auto;
 	font-size: 13px;
 }
-table { border-collapse: collapse; max-width: 100%; }
+table { border-collapse: collapse; max-width: 100% !important; width: auto !important; }
+table[width], table[style*="width"] { width: 100% !important; max-width: 100% !important; }
 td, th { padding: 4px 8px; }
 p { margin: 4px 0; }
 h1, h2, h3 { margin: 8px 0 4px; }
@@ -140,12 +144,14 @@ ul, ol { padding-left: 20px; margin: 4px 0; }
 	}, [body, autoSize]);
 
 	return (
-		<iframe
-			ref={iframeRef}
-			className="block w-full border-0"
-			style={autoSize ? { height: `${height}px` } : { height: "100%" }}
-			sandbox="allow-scripts allow-popups allow-top-navigation-by-user-activation"
-			title="Email content"
-		/>
+		<div className="h-full w-full min-w-0 max-w-full overflow-hidden">
+			<iframe
+				ref={iframeRef}
+				className="block w-full max-w-full min-w-0 border-0"
+				style={autoSize ? { height: `${height}px` } : { height: "100%", minWidth: 0 }}
+				sandbox="allow-scripts allow-popups allow-top-navigation-by-user-activation"
+				title="Email content"
+			/>
+		</div>
 	);
 }

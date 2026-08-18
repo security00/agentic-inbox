@@ -101,8 +101,8 @@ export default function ThreadMessage({
 	}
 
 	return (
-		<div className={`group/thread-msg ${containerClassName}`}>
-			<div className="px-4 py-4 md:px-6">
+		<div className={`group/thread-msg min-w-0 overflow-hidden ${containerClassName}`}>
+			<div className="px-4 py-4 min-w-0 overflow-hidden md:px-6">
 				<div className="flex items-center justify-between gap-3 mb-3">
 					<div className="flex items-center gap-2.5 min-w-0">
 						<button
@@ -156,7 +156,7 @@ export default function ThreadMessage({
 					</div>
 				</div>
 
-				<div className="md:ml-[42px]">
+				<div className="min-w-0 overflow-hidden md:ml-[42px]">
 					<EmailIframe
 						body={rewriteInlineImages(
 							email.body || "",
