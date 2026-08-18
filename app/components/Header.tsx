@@ -65,13 +65,13 @@ export default function Header() {
 				icon={<ListIcon size={20} />}
 				onClick={toggleSidebar}
 				aria-label="打开或关闭侧栏"
-				className="md:hidden shrink-0"
+				className="sm:hidden shrink-0"
 			/>
 
 			{/* Search - full on desktop, collapsible on mobile */}
 			<div
 				className={`flex-1 min-w-0 max-w-lg transition-all flex items-center gap-1 ${
-					isSearchExpanded ? "flex" : "hidden md:flex"
+					isSearchExpanded ? "flex" : "hidden sm:flex"
 				}`}
 			>
 				<div className="flex-1 min-w-0 relative flex items-center">
@@ -114,7 +114,7 @@ export default function Header() {
 					icon={<MagnifyingGlassIcon size={20} />}
 					onClick={() => setIsSearchExpanded(true)}
 					aria-label="搜索"
-					className="md:hidden shrink-0"
+					className="sm:hidden shrink-0"
 				/>
 			)}
 
