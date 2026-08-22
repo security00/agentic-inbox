@@ -230,14 +230,15 @@ export function useComposeForm(mailboxId?: string, _folder?: string) {
 		setAttachments([]);
 	}, [composeOptions, currentMailbox?.email, sigBlock, templateFetched]);
 
-	const handleAddAttachments = useCallback(async (files: FileList | null) => {
+	const handleAddAttachments = useCallback(async (files: FileList | File[] | null) => {
 		if (!files || files.length === 0) return;
 
 		const newAttachments: PendingAttachment[] = [];
 		let totalSize = attachments.reduce((sum, att) => sum + att.size, 0);
 
-		for (let i = 0; i < files.length; i++) {
-			const file = files[i];
+		const fileArray = Array.from(files);
+		for (let i = 0; i < fileArray.length; i++) {
+			const file = fileArray[i];
 
 			if (attachments.length + newAttachments.length >= MAX_FILE_COUNT) {
 				setError(`最多只能添加 ${MAX_FILE_COUNT} 个附件。`);

@@ -8,7 +8,7 @@ import { useParams } from "react-router";
 import { useComposeForm } from "~/hooks/useComposeForm";
 import RichTextEditor from "./RichTextEditor";
 import { formatBytes } from "~/lib/utils";
-import { useRef } from "react";
+import { useRef, useState } from "react";
 
 export default function ComposePanel() {
 	const { mailboxId, folder } = useParams<{
@@ -16,6 +16,7 @@ export default function ComposePanel() {
 		folder: string;
 	}>();
 	const fileInputRef = useRef<HTMLInputElement>(null);
+	const [isDragging, setIsDragging] = useState(false);
 
 	const {
 		to,
@@ -45,6 +46,50 @@ export default function ComposePanel() {
 		handleRemoveAttachment,
 	} = useComposeForm(mailboxId, folder);
 
+	const handlePaste = (e: React.ClipboardEvent) => {
+		const items = e.clipboardData?.items;
+		if (!items) return;
+
+		const files: File[] = [];
+		for (let i = 0; i < items.length; i++) {
+			const item = items[i];
+			if (item.kind === 'file') {
+				const file = item.getAsFile();
+				if (file) files.push(file);
+			}
+		}
+
+		if (files.length > 0) {
+			e.preventDefault();
+			handleAddAttachments(files);
+		}
+	};
+
+	const handleDragOver = (e: React.DragEvent) => {
+		e.preventDefault();
+		e.stopPropagation();
+		if (!isDragging) setIsDragging(true);
+	};
+
+	const handleDragLeave = (e: React.DragEvent) => {
+		e.preventDefault();
+		e.stopPropagation();
+		if (e.currentTarget === e.target || !e.currentTarget.contains(e.relatedTarget as Node)) {
+			setIsDragging(false);
+		}
+	};
+
+	const handleDrop = (e: React.DragEvent) => {
+		e.preventDefault();
+		e.stopPropagation();
+		setIsDragging(false);
+
+		const files = e.dataTransfer?.files;
+		if (files && files.length > 0) {
+			handleAddAttachments(files);
+		}
+	};
+
 	return (
 		<div className="flex flex-col h-full bg-kumo-base">
 			<div className="flex items-center justify-between px-4 py-3 border-b border-kumo-line shrink-0 md:px-6">
@@ -66,7 +111,11 @@ export default function ComposePanel() {
 
 			<form
 				onSubmit={(e) => handleSend(e, closePanel)}
-				className="flex flex-col flex-1 min-h-0 overflow-y-auto"
+				onPaste={handlePaste}
+				onDragOver={handleDragOver}
+				onDragLeave={handleDragLeave}
+				onDrop={handleDrop}
+				className={`flex flex-col flex-1 min-h-0 overflow-y-auto relative ${isDragging ? 'ring-2 ring-inset ring-kumo-link' : ''}`}
 			>
 				<div className="p-4 md:p-6 space-y-4">
 					{error && <Banner variant="error" text={error} />}
