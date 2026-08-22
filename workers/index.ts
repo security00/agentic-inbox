@@ -193,6 +193,19 @@ app.get("/api/v1/mailboxes", async (c) => {
 	return c.json(allMailboxes.map((m) => ({ ...m, name: m.id })));
 });
 
+app.get("/api/v1/mailboxes/unread-summary", async (c) => {
+	const allMailboxes = await listMailboxes(c.env.BUCKET);
+	const results = await Promise.all(
+		allMailboxes.map(async (mailbox) => {
+			const mailboxId = mailbox.id;
+			const stub = c.env.MAILBOX.get(c.env.MAILBOX.idFromName(mailboxId));
+			const unreadCount = await (stub as any).getInboxUnreadCount();
+			return { mailboxId, unreadCount };
+		}),
+	);
+	return c.json(results);
+});
+
 app.post("/api/v1/mailboxes", async (c) => {
 	const { name, settings, email: rawEmail } = CreateMailboxBody.parse(await c.req.json());
 	const email = rawEmail.toLowerCase();

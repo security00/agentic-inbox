@@ -67,6 +67,17 @@ export default function EmailPanel({ emailId }: { emailId: string }) {
 	const currentEmailId = email?.id;
 	useEffect(() => { if (allMessages.length > 1) setExpandedMessages(new Set([allMessages[0].id])); }, [currentEmailId]); // eslint-disable-line react-hooks/exhaustive-deps
 
+	// Auto-mark email as read when opening
+	useEffect(() => {
+		if (email && !email.read && mailboxId && !isDraftFolder) {
+			updateEmail.mutate({
+				mailboxId,
+				id: email.id,
+				data: { read: true },
+			});
+		}
+	}, [email?.id, email?.read, mailboxId, isDraftFolder]); // eslint-disable-line react-hooks/exhaustive-deps
+
 	const toggleExpand = (msgId: string) => { setExpandedMessages((prev) => { const next = new Set(prev); if (next.has(msgId)) next.delete(msgId); else next.add(msgId); return next; }); };
 
 	const draftMessageIds = useMemo(() => {

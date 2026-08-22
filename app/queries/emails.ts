@@ -101,6 +101,8 @@ function useInvalidateEmailData() {
 		qc.invalidateQueries({
 			queryKey: queryKeys.folders.list(mailboxId),
 		});
+		// Invalidate unread summary to update badges
+		qc.invalidateQueries({ queryKey: [...queryKeys.mailboxes.all, "unread-summary"] });
 	};
 }
 
@@ -183,6 +185,8 @@ export function useUpdateEmail() {
 			qc.invalidateQueries({
 				queryKey: queryKeys.folders.list(mailboxId),
 			});
+			// Invalidate unread summary to update badges
+			qc.invalidateQueries({ queryKey: [...queryKeys.mailboxes.all, "unread-summary"] });
 		},
 	});
 }
@@ -200,6 +204,8 @@ export function useMarkThreadRead() {
 			qc.invalidateQueries({
 				queryKey: queryKeys.folders.list(mailboxId),
 			});
+			// Invalidate unread summary to update badges
+			qc.invalidateQueries({ queryKey: [...queryKeys.mailboxes.all, "unread-summary"] });
 		},
 	});
 }
