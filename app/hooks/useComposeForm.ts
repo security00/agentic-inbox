@@ -19,14 +19,6 @@ import { useMailbox } from "~/queries/mailboxes";
 import { useSignatureTemplate } from "~/queries/settings";
 import { useUIStore } from "~/hooks/useUIStore";
 
-interface ComposeAttachment {
-	id: string;
-	file: File;
-	dataUrl: string;
-	isImage: boolean;
-	insertedInline: boolean;
-}
-
 function appendUniqueAddress(
 	addresses: string[],
 	seen: Set<string>,
@@ -60,6 +52,19 @@ const EMPTY_FIELDS: ComposeFormFields = {
 	subject: "",
 	body: "",
 };
+
+export interface PendingAttachment {
+	id: string;
+	filename: string;
+	type: string;
+	size: number;
+	contentBase64: string;
+	disposition: "attachment" | "inline";
+}
+
+const MAX_FILE_SIZE = 10 * 1024 * 1024;
+const MAX_TOTAL_SIZE = 20 * 1024 * 1024;
+const MAX_FILE_COUNT = 10;
 
 function getPrefixedSubject(subject: string, prefix: "Re" | "Fwd") {
 	const expectedPrefix = `${prefix}: `;
@@ -188,13 +193,12 @@ export function useComposeForm(mailboxId?: string, _folder?: string) {
 	const [showCcBcc, setShowCcBcc] = useState(false);
 	const [subject, setSubject] = useState("");
 	const [body, setBody] = useState("");
-	const [attachments, setAttachments] = useState<ComposeAttachment[]>([]);
 	const [error, setError] = useState<string | null>(null);
 	const [isSavingDraft, setIsSavingDraft] = useState(false);
 	const [isSending, setIsSending] = useState(false);
+	const [attachments, setAttachments] = useState<PendingAttachment[]>([]);
 	const lastInitializedOptionsRef = useRef<typeof composeOptions | null>(null);
 	const isDraftEdit = !!composeOptions.draftEmail;
-	const editorInsertImageRef = useRef<((src: string, alt?: string) => void) | null>(null);
 
 	const formTitle = useMemo(() => {
 		if (isDraftEdit) return "编辑草稿";
@@ -223,75 +227,69 @@ export function useComposeForm(mailboxId?: string, _folder?: string) {
 		setShowCcBcc(initialFields.showCcBcc);
 		setSubject(initialFields.subject);
 		setBody(initialFields.body);
+		setAttachments([]);
 	}, [composeOptions, currentMailbox?.email, sigBlock, templateFetched]);
 
-	const handleAddAttachments = useCallback(async (files: File[]) => {
-		const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
-		const MAX_TOTAL_SIZE = 20 * 1024 * 1024; // 20MB
-		const MAX_FILES = 10;
+	const handleAddAttachments = useCallback(async (files: FileList | File[] | null) => {
+		if (!files || files.length === 0) return;
 
-		const currentTotalSize = attachments.reduce((sum, att) => sum + att.file.size, 0);
-		
-		if (attachments.length + files.length > MAX_FILES) {
-			toastManager.add({ title: `最多只能添加 ${MAX_FILES} 个附件`, variant: "error" });
-			return;
-		}
+		const newAttachments: PendingAttachment[] = [];
+		let totalSize = attachments.reduce((sum, att) => sum + att.size, 0);
 
-		const newAttachments: ComposeAttachment[] = [];
-		let newTotalSize = currentTotalSize;
+		const fileArray = Array.from(files);
+		for (let i = 0; i < fileArray.length; i++) {
+			const file = fileArray[i];
 
-		for (const file of files) {
-			if (file.size > MAX_FILE_SIZE) {
-				toastManager.add({ title: `文件 "${file.name}" 超过 10MB 限制`, variant: "error" });
-				continue;
-			}
-
-			if (newTotalSize + file.size > MAX_TOTAL_SIZE) {
-				toastManager.add({ title: "附件总大小不能超过 20MB", variant: "error" });
+			if (attachments.length + newAttachments.length >= MAX_FILE_COUNT) {
+				setError(`最多只能添加 ${MAX_FILE_COUNT} 个附件。`);
 				break;
 			}
 
-			const isImage = file.type.startsWith("image/");
-			const reader = new FileReader();
-			
-			await new Promise<void>((resolve) => {
-				reader.onload = () => {
-					const dataUrl = reader.result as string;
-					const id = `att-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-					
-					newAttachments.push({
-						id,
-						file,
-						dataUrl,
-						isImage,
-						insertedInline: false,
-					});
-					
-					newTotalSize += file.size;
-					
-					// For images, insert into editor
-					if (isImage && editorInsertImageRef.current) {
-						editorInsertImageRef.current(dataUrl, file.name);
-						newAttachments[newAttachments.length - 1].insertedInline = true;
-					}
-					
-					resolve();
-				};
-				reader.readAsDataURL(file);
-			});
+			if (file.size > MAX_FILE_SIZE) {
+				setError(`文件 "${file.name}" 太大（最大 10MB）。`);
+				continue;
+			}
+
+			if (totalSize + file.size > MAX_TOTAL_SIZE) {
+				setError(`附件总大小超过限制（最大 20MB）。`);
+				break;
+			}
+
+			try {
+				const base64 = await new Promise<string>((resolve, reject) => {
+					const reader = new FileReader();
+					reader.onload = () => {
+						const result = reader.result as string;
+						const base64Data = result.split(',')[1];
+						resolve(base64Data);
+					};
+					reader.onerror = () => reject(reader.error);
+					reader.readAsDataURL(file);
+				});
+
+				newAttachments.push({
+					id: `${Date.now()}-${i}`,
+					filename: file.name,
+					type: file.type || "application/octet-stream",
+					size: file.size,
+					contentBase64: base64,
+					disposition: "attachment",
+				});
+
+				totalSize += file.size;
+			} catch (err) {
+				setError(`无法读取文件 "${file.name}"。`);
+			}
 		}
 
 		if (newAttachments.length > 0) {
 			setAttachments(prev => [...prev, ...newAttachments]);
+			toastManager.add({ title: `已添加 ${newAttachments.length} 个附件` });
 		}
 	}, [attachments, toastManager]);
 
 	const handleRemoveAttachment = useCallback((id: string) => {
 		setAttachments(prev => prev.filter(att => att.id !== id));
-	}, []);
-
-	const setEditorInsertImage = useCallback((fn: (src: string, alt?: string) => void) => {
-		editorInsertImageRef.current = fn;
 	}, []);
 
 	const handleSaveDraft = async () => {
@@ -325,64 +323,22 @@ export function useComposeForm(mailboxId?: string, _folder?: string) {
 		const ccRecipients = splitEmailList(cc); const bccRecipients = splitEmailList(bcc);
 		const fromName = currentMailbox.settings?.fromName || currentMailbox.name;
 		const from = fromName && fromName !== currentMailbox.email ? { email: currentMailbox.email, name: fromName } : currentMailbox.email;
-		
-		// Process inline images: convert data URLs to CID references
-		let processedHtml = body;
-		const emailAttachments: {
-			content: string;
-			filename: string;
-			type: string;
-			disposition: "attachment" | "inline";
-			contentId?: string;
-		}[] = [];
-
-		// Create a map of data URLs to content IDs for inline images
-		const dataUrlToCid = new Map<string, string>();
-		
-		for (const att of attachments) {
-			const base64Content = att.dataUrl.split(',')[1];
-			
-			if (att.isImage && att.insertedInline) {
-				// Generate a content ID for inline images
-				const contentId = `img-${att.id}`;
-				dataUrlToCid.set(att.dataUrl, contentId);
-				
-				emailAttachments.push({
-					content: base64Content,
-					filename: att.file.name,
-					type: att.file.type,
-					disposition: "inline",
-					contentId,
-				});
-			} else {
-				// Regular attachments
-				emailAttachments.push({
-					content: base64Content,
-					filename: att.file.name,
-					type: att.file.type,
-					disposition: "attachment",
-				});
-			}
-		}
-
-		// Replace data URLs with CID references in the HTML
-		for (const [dataUrl, contentId] of dataUrlToCid.entries()) {
-			const escapedDataUrl = dataUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-			processedHtml = processedHtml.replace(
-				new RegExp(`src="${escapedDataUrl}"`, 'g'),
-				`src="cid:${contentId}"`
-			);
-		}
-		
 		const emailData = {
 			to: toEmailListValue(toRecipients),
 			cc: toEmailListValue(ccRecipients),
 			bcc: toEmailListValue(bccRecipients),
 			from,
 			subject,
-			html: processedHtml,
-			text: htmlToPlainText(processedHtml),
-			...(emailAttachments.length > 0 ? { attachments: emailAttachments } : {}),
+			html: body,
+			text: htmlToPlainText(body),
+			...(attachments.length > 0 ? {
+				attachments: attachments.map(att => ({
+					content: att.contentBase64,
+					filename: att.filename,
+					type: att.type,
+					disposition: att.disposition,
+				}))
+			} : {}),
 		};
 		const draftId = composeOptions.draftEmail?.id; const mode = composeOptions.mode; const originalId = composeOptions.originalEmail?.id || composeOptions.draftEmail?.in_reply_to;
 		setIsSending(true); toastManager.add({ title: "正在发送…" });
@@ -400,5 +356,5 @@ export function useComposeForm(mailboxId?: string, _folder?: string) {
 	const sendAsName = currentMailbox?.settings?.fromName || currentMailbox?.name || "";
 	const sendAsEmail = currentMailbox?.email || mailboxId || "";
 
-	return { to, setTo, cc, setCc, bcc, setBcc, showCcBcc, setShowCcBcc, subject, setSubject, body, setBody, attachments, handleAddAttachments, handleRemoveAttachment, setEditorInsertImage, error, setError, isSavingDraft, isSending, formTitle, sendAsName, sendAsEmail, handleSaveDraft, handleSend, closeCompose, closePanel };
+	return { to, setTo, cc, setCc, bcc, setBcc, showCcBcc, setShowCcBcc, subject, setSubject, body, setBody, error, setError, isSavingDraft, isSending, formTitle, sendAsName, sendAsEmail, handleSaveDraft, handleSend, closeCompose, closePanel, attachments, handleAddAttachments, handleRemoveAttachment };
 }

@@ -869,4 +869,20 @@ export class MailboxDO extends DurableObject<Env> {
 			this.db.insert(schema.attachments).values(attachments).run();
 		}
 	}
+
+	/**
+	 * Count unread emails in the inbox folder for this mailbox.
+	 * Used by the unread-summary endpoint to show badges on the mailbox list.
+	 */
+	async getInboxUnreadCount(): Promise<number> {
+		const row = [
+			...this.ctx.storage.sql.exec(
+				`SELECT COUNT(*) as cnt FROM emails
+				 WHERE folder_id = (SELECT id FROM folders WHERE name = ?1 OR id = ?1 LIMIT 1)
+				   AND read = 0`,
+				Folders.INBOX,
+			),
+		][0] as { cnt: number } | undefined;
+		return row?.cnt ?? 0;
+	}
 }
