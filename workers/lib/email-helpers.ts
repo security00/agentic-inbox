@@ -44,6 +44,38 @@ export async function listMailboxes(
 	});
 }
 
+/**
+ * List all mailboxes with unread counts.
+ * Fetches the inbox unread count from each mailbox's Durable Object.
+ */
+export async function listMailboxesWithUnreadCounts(
+	env: Env,
+): Promise<{ id: string; email: string; unreadCount: number }[]> {
+	const mailboxes = await listMailboxes(env.BUCKET);
+	
+	// Fetch unread counts in parallel for all mailboxes
+	const unreadCounts = await Promise.all(
+		mailboxes.map(async (mailbox) => {
+			try {
+				const stub = getMailboxStub(env, mailbox.id);
+				const count = await stub.getInboxUnreadCount();
+				return { id: mailbox.id, count };
+			} catch {
+				// If a mailbox's DO fails, return 0 instead of failing the entire request
+				return { id: mailbox.id, count: 0 };
+			}
+		})
+	);
+	
+	// Build a map of mailbox ID to unread count
+	const unreadMap = new Map(unreadCounts.map(u => [u.id, u.count]));
+	
+	return mailboxes.map(mailbox => ({
+		...mailbox,
+		unreadCount: unreadMap.get(mailbox.id) ?? 0,
+	}));
+}
+
 // ── Sender Validation ──────────────────────────────────────────────
 
 /**

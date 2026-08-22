@@ -317,43 +317,54 @@ export default function HomeRoute() {
 					</div>
 				) : visibleAccounts.length > 0 ? (
 					<div className="rounded-xl border border-kumo-line bg-kumo-base overflow-hidden">
-						{visibleAccounts.map((account, idx) => (
-							<RouterLink
-								key={account.id}
-								to={`/mailbox/${account.id}`}
-								className={`group flex items-center gap-4 px-5 py-4 no-underline transition-colors hover:bg-kumo-tint ${
-									idx > 0 ? "border-t border-kumo-line" : ""
-								}`}
-							>
-								<div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-kumo-fill text-sm font-bold text-kumo-default">
-									{account.name.charAt(0).toUpperCase()}
-								</div>
-								<div className="min-w-0 flex-1">
-									<div className="text-sm font-medium text-kumo-default truncate">
-										{account.name}
+						{visibleAccounts.map((account, idx) => {
+							const mailbox = mailboxByEmail.get(account.email.toLowerCase());
+							const unreadCount = mailbox?.unreadCount ?? 0;
+							return (
+								<RouterLink
+									key={account.id}
+									to={`/mailbox/${account.id}`}
+									className={`group flex items-center gap-4 px-5 py-4 no-underline transition-colors hover:bg-kumo-tint ${
+										idx > 0 ? "border-t border-kumo-line" : ""
+									}`}
+								>
+									<div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-kumo-fill text-sm font-bold text-kumo-default">
+										{account.name.charAt(0).toUpperCase()}
 									</div>
-									<div className="text-sm text-kumo-subtle">
-										{account.email}
+									<div className="min-w-0 flex-1">
+										<div className="flex items-center gap-2">
+											<div className="text-sm font-medium text-kumo-default truncate">
+												{account.name}
+											</div>
+											{unreadCount > 0 && (
+												<span className="inline-flex items-center justify-center px-2 py-0.5 text-xs font-medium rounded-full bg-kumo-primary text-white shrink-0">
+													{unreadCount}
+												</span>
+											)}
+										</div>
+										<div className="text-sm text-kumo-subtle">
+											{account.email}
+										</div>
 									</div>
-								</div>
-								<Button
-									variant="ghost"
-									size="sm"
-									shape="square"
-									icon={<TrashIcon size={16} />}
-									aria-label={`删除邮箱 ${account.email}`}
-									onClick={(e) => {
-										e.preventDefault();
-										e.stopPropagation();
-										setMailboxToDelete({
-											id: account.id,
-											email: account.email,
-										});
-										setIsDeleteOpen(true);
-									}}
-								/>
-							</RouterLink>
-						))}
+									<Button
+										variant="ghost"
+										size="sm"
+										shape="square"
+										icon={<TrashIcon size={16} />}
+										aria-label={`删除邮箱 ${account.email}`}
+										onClick={(e) => {
+											e.preventDefault();
+											e.stopPropagation();
+											setMailboxToDelete({
+												id: account.id,
+												email: account.email,
+											});
+											setIsDeleteOpen(true);
+										}}
+									/>
+								</RouterLink>
+							);
+						})}
 					</div>
 				) : (
 					<div className="rounded-xl border border-kumo-line bg-kumo-base py-16 px-6">

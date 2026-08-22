@@ -14,6 +14,7 @@ import {
 	generateMessageId,
 	buildThreadingHeaders,
 	listMailboxes,
+	listMailboxesWithUnreadCounts,
 } from "./lib/email-helpers";
 import { SendEmailRequestSchema } from "./lib/schemas";
 import { handleReplyEmail, handleForwardEmail } from "./routes/reply-forward";
@@ -189,7 +190,7 @@ app.put("/api/v1/settings/signature-template", async (c) => {
 // -- Mailboxes ------------------------------------------------------
 
 app.get("/api/v1/mailboxes", async (c) => {
-	const allMailboxes = await listMailboxes(c.env.BUCKET);
+	const allMailboxes = await listMailboxesWithUnreadCounts(c.env);
 	return c.json(allMailboxes.map((m) => ({ ...m, name: m.id })));
 });
 

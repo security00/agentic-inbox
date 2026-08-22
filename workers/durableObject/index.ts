@@ -586,6 +586,21 @@ export class MailboxDO extends DurableObject<Env> {
 		return result;
 	}
 
+	/**
+	 * Get the unread count for the inbox folder.
+	 * Used for per-mailbox unread count display.
+	 */
+	async getInboxUnreadCount(): Promise<number> {
+		const row = [
+			...this.ctx.storage.sql.exec(
+				`SELECT COUNT(*) as count FROM emails
+				 WHERE folder_id = (SELECT id FROM folders WHERE name = 'inbox' LIMIT 1)
+				   AND read = 0`,
+			),
+		][0] as { count: number } | undefined;
+		return row?.count ?? 0;
+	}
+
 	async createFolder(id: string, name: string, is_deletable: number = 1) {
 		try {
 			const result = this.db

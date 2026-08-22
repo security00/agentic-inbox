@@ -122,6 +122,7 @@ export default function MailboxSwitcher({
 						) : (
 							filtered.map((m) => {
 								const active = m.id === currentId || m.email === currentId;
+								const unreadCount = m.unreadCount ?? 0;
 								return (
 									<button
 										key={m.id}
@@ -134,8 +135,15 @@ export default function MailboxSwitcher({
 										}`}
 									>
 										<div className="min-w-0 flex-1">
-											<div className="text-sm text-kumo-default truncate">
-												{mailboxLabel(m)}
+											<div className="flex items-center gap-2">
+												<div className="text-sm text-kumo-default truncate">
+													{mailboxLabel(m)}
+												</div>
+												{unreadCount > 0 && (
+													<span className="inline-flex items-center justify-center px-1.5 py-0.5 text-xs font-medium rounded-full bg-kumo-primary text-white shrink-0">
+														{unreadCount}
+													</span>
+												)}
 											</div>
 											<div className="text-xs text-kumo-subtle truncate">
 												{m.email}
