@@ -4,11 +4,11 @@
 
 import { Banner, Button, Input } from "@cloudflare/kumo";
 import { FloppyDiskIcon, PaperPlaneTiltIcon, PaperclipIcon, XIcon } from "@phosphor-icons/react";
+import React, { useRef } from "react";
 import { useParams } from "react-router";
 import { useComposeForm } from "~/hooks/useComposeForm";
 import RichTextEditor, { type RichTextEditorRef } from "./RichTextEditor";
 import { formatBytes } from "~/lib/utils";
-import { useRef } from "react";
 
 export default function ComposePanel() {
 	const { mailboxId, folder } = useParams<{
@@ -48,10 +48,12 @@ export default function ComposePanel() {
 		closePanel,
 	} = useComposeForm(mailboxId, folder);
 
-	// Connect editor to form
-	if (editorRef.current && !isSending) {
-		setEditorInsertImage(editorRef.current.insertImage);
-	}
+	// Connect editor to form once it's ready
+	React.useEffect(() => {
+		if (editorRef.current && !isSending) {
+			setEditorInsertImage(editorRef.current.insertImage);
+		}
+	}, [setEditorInsertImage, isSending]);
 
 	return (
 		<div className="flex flex-col h-full bg-kumo-base">
