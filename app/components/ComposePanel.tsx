@@ -4,11 +4,11 @@
 
 import { Banner, Button, Input } from "@cloudflare/kumo";
 import { FloppyDiskIcon, PaperPlaneTiltIcon, XIcon, PaperclipIcon } from "@phosphor-icons/react";
+import React, { useRef, useState } from "react";
 import { useParams } from "react-router";
 import { useComposeForm } from "~/hooks/useComposeForm";
-import RichTextEditor from "./RichTextEditor";
+import RichTextEditor, { type RichTextEditorRef } from "./RichTextEditor";
 import { formatBytes } from "~/lib/utils";
-import { useRef, useState } from "react";
 
 export default function ComposePanel() {
 	const { mailboxId, folder } = useParams<{
@@ -16,6 +16,7 @@ export default function ComposePanel() {
 		folder: string;
 	}>();
 	const fileInputRef = useRef<HTMLInputElement>(null);
+	const editorRef = useRef<RichTextEditorRef>(null);
 	const [isDragging, setIsDragging] = useState(false);
 
 	const {
@@ -44,16 +45,26 @@ export default function ComposePanel() {
 		attachments,
 		handleAddAttachments,
 		handleRemoveAttachment,
+		setEditorInsertImage,
 	} = useComposeForm(mailboxId, folder);
+
+	// Connect editor insertImage function to form
+	React.useEffect(() => {
+		if (editorRef.current && !isSending) {
+			setEditorInsertImage(editorRef.current.insertImage);
+		}
+	}, [setEditorInsertImage, isSending]);
 
 	const handlePaste = (e: React.ClipboardEvent) => {
 		const items = e.clipboardData?.items;
 		if (!items) return;
 
+		// Only handle non-image files at form level
+		// Images are handled by RichTextEditor's onImagePaste
 		const files: File[] = [];
 		for (let i = 0; i < items.length; i++) {
 			const item = items[i];
-			if (item.kind === 'file') {
+			if (item.kind === 'file' && !item.type.startsWith('image/')) {
 				const file = item.getAsFile();
 				if (file) files.push(file);
 			}
@@ -204,8 +215,10 @@ export default function ComposePanel() {
 
 					<div className="border border-kumo-line rounded-md overflow-hidden bg-kumo-base">
 						<RichTextEditor
+							ref={editorRef}
 							value={body}
 							onChange={setBody}
+							onImagePaste={(file) => handleAddAttachments([file])}
 						/>
 					</div>
 
@@ -245,6 +258,9 @@ export default function ComposePanel() {
 												<PaperclipIcon size={14} className="text-kumo-subtle shrink-0" />
 												<span className="text-sm text-kumo-default font-medium truncate">
 													{att.filename}
+													{att.disposition === "inline" && (
+														<span className="ml-1 text-xs text-kumo-subtle">(正文图片)</span>
+													)}
 												</span>
 												<span className="text-xs text-kumo-subtle shrink-0">
 													{formatBytes(att.size)}
