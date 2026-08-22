@@ -7,6 +7,7 @@ import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } fro
 import {
 	buildQuotedReplyBlock,
 	escapeHtml,
+	formatBytes,
 	formatComposeDate,
 	getSignatureBlock,
 	htmlToPlainText,
@@ -14,6 +15,7 @@ import {
 	stripHtml,
 	toEmailListValue,
 } from "~/lib/utils";
+import { optimizeImageLossless } from "~/lib/lossless-image-optimizer";
 import { useDeleteEmail, useForwardEmail, useReplyToEmail, useSaveDraft, useSendEmail } from "~/queries/emails";
 import { useMailbox } from "~/queries/mailboxes";
 import { useSignatureTemplate } from "~/queries/settings";
@@ -62,8 +64,8 @@ export interface PendingAttachment {
 	disposition: "attachment" | "inline";
 }
 
-const MAX_FILE_SIZE = 10 * 1024 * 1024;
-const MAX_TOTAL_SIZE = 20 * 1024 * 1024;
+const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25MB per file
+const MAX_TOTAL_SIZE = 50 * 1024 * 1024; // 50MB total
 const MAX_FILE_COUNT = 10;
 
 function getPrefixedSubject(subject: string, prefix: "Re" | "Fwd") {
@@ -239,20 +241,39 @@ export function useComposeForm(mailboxId?: string, _folder?: string) {
 
 		const fileArray = Array.from(files);
 		for (let i = 0; i < fileArray.length; i++) {
-			const file = fileArray[i];
+			let file = fileArray[i];
 
 			if (attachments.length + newAttachments.length >= MAX_FILE_COUNT) {
 				setError(`最多只能添加 ${MAX_FILE_COUNT} 个附件。`);
 				break;
 			}
 
+			// Optimize images losslessly before size checks
+			if (file.type.startsWith("image/")) {
+				try {
+					const result = await optimizeImageLossless(file);
+					if (result.saved > 0) {
+						file = result.optimizedFile;
+						// Show toast for meaningful savings (> 100KB)
+						if (result.saved > 100 * 1024) {
+							toastManager.add({
+								title: `图片已无损优化：${formatBytes(result.originalSize)} → ${formatBytes(result.optimizedSize)}`,
+							});
+						}
+					}
+				} catch (err) {
+					console.warn('Failed to optimize image:', err);
+					// Continue with original file
+				}
+			}
+
 			if (file.size > MAX_FILE_SIZE) {
-				setError(`文件 "${file.name}" 太大（最大 10MB）。`);
+				setError(`文件 "${file.name}" 太大（无损压缩后仍超过 25MB 限制）。`);
 				continue;
 			}
 
 			if (totalSize + file.size > MAX_TOTAL_SIZE) {
-				setError(`附件总大小超过限制（最大 20MB）。`);
+				setError(`附件总大小超过限制（最大 50MB）。`);
 				break;
 			}
 
