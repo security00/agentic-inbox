@@ -110,7 +110,7 @@ const api = {
 	// Mailboxes
 	listMailboxes: () => get<Mailbox[]>("/api/v1/mailboxes"),
 	getUnreadSummary: () =>
-		get<Array<{ mailboxId: string; unreadCount: number }>>("/api/v1/mailboxes/unread-summary"),
+		get<Array<{ mailboxId: string; unreadCount: number }>>("/api/v1/unread-summary"),
 	createMailbox: (email: string, name: string, settings?: unknown) =>
 		post<Mailbox>("/api/v1/mailboxes", { email, name, settings }),
 	getMailbox: (mailboxId: string) =>

@@ -586,21 +586,6 @@ export class MailboxDO extends DurableObject<Env> {
 		return result;
 	}
 
-	/**
-	 * Get unread count for inbox folder only (for efficient mailbox list badges).
-	 * Returns the count of emails in inbox with read = 0.
-	 */
-	async getInboxUnreadCount(): Promise<number> {
-		const row = [
-			...this.ctx.storage.sql.exec(
-				`SELECT COUNT(*) as count FROM emails
-				 WHERE folder_id = (SELECT id FROM folders WHERE name = 'inbox' LIMIT 1)
-				   AND read = 0`,
-			),
-		][0] as { count: number } | undefined;
-		return row?.count ?? 0;
-	}
-
 	async createFolder(id: string, name: string, is_deletable: number = 1) {
 		try {
 			const result = this.db
@@ -883,5 +868,21 @@ export class MailboxDO extends DurableObject<Env> {
 		if (attachments.length > 0) {
 			this.db.insert(schema.attachments).values(attachments).run();
 		}
+	}
+
+	/**
+	 * Count unread emails in the inbox folder for this mailbox.
+	 * Used by the unread-summary endpoint to show badges on the mailbox list.
+	 */
+	async getInboxUnreadCount(): Promise<number> {
+		const row = [
+			...this.ctx.storage.sql.exec(
+				`SELECT COUNT(*) as cnt FROM emails
+				 WHERE folder_id = (SELECT id FROM folders WHERE name = ?1 OR id = ?1 LIMIT 1)
+				   AND read = 0`,
+				Folders.INBOX,
+			),
+		][0] as { cnt: number } | undefined;
+		return row?.cnt ?? 0;
 	}
 }

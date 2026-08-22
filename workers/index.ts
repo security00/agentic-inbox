@@ -188,22 +188,28 @@ app.put("/api/v1/settings/signature-template", async (c) => {
 
 // -- Mailboxes ------------------------------------------------------
 
+app.get("/api/v1/unread-summary", async (c) => {
+	const allMailboxes = await listMailboxes(c.env.BUCKET);
+	const summary: Array<{ mailboxId: string; unreadCount: number }> = [];
+
+	for (const mailbox of allMailboxes) {
+		const mailboxId = mailbox.email || mailbox.id;
+		try {
+			const stub = c.env.MAILBOX.get(c.env.MAILBOX.idFromName(mailboxId));
+			const unreadCount = await (stub as any).getInboxUnreadCount();
+			summary.push({ mailboxId, unreadCount });
+		} catch (error) {
+			console.error(`Failed to get unread count for ${mailboxId}:`, error);
+			summary.push({ mailboxId, unreadCount: 0 });
+		}
+	}
+
+	return c.json(summary);
+});
+
 app.get("/api/v1/mailboxes", async (c) => {
 	const allMailboxes = await listMailboxes(c.env.BUCKET);
 	return c.json(allMailboxes.map((m) => ({ ...m, name: m.id })));
-});
-
-app.get("/api/v1/mailboxes/unread-summary", async (c) => {
-	const allMailboxes = await listMailboxes(c.env.BUCKET);
-	const results = await Promise.all(
-		allMailboxes.map(async (mailbox) => {
-			const mailboxId = mailbox.id;
-			const stub = c.env.MAILBOX.get(c.env.MAILBOX.idFromName(mailboxId));
-			const unreadCount = await (stub as any).getInboxUnreadCount();
-			return { mailboxId, unreadCount };
-		}),
-	);
-	return c.json(results);
 });
 
 app.post("/api/v1/mailboxes", async (c) => {
