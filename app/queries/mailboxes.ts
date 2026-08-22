@@ -14,6 +14,14 @@ export function useMailboxes() {
 	});
 }
 
+export function useUnreadSummary() {
+	return useQuery<Array<{ mailboxId: string; unreadCount: number }>>({
+		queryKey: [...queryKeys.mailboxes.all, "unread-summary"],
+		queryFn: () => api.getUnreadSummary(),
+		refetchInterval: 30000, // Refresh every 30 seconds
+	});
+}
+
 export function useMailbox(mailboxId: string | undefined) {
 	return useQuery<Mailbox>({
 		queryKey: mailboxId

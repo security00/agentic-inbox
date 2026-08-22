@@ -21,6 +21,7 @@ import {
 	useCreateMailbox,
 	useDeleteMailbox,
 	useMailboxes,
+	useUnreadSummary,
 } from "~/queries/mailboxes";
 import { useAddDomain, useSignatureTemplate, useUpdateSignatureTemplate } from "~/queries/settings";
 import { queryKeys } from "~/queries/keys";
@@ -48,6 +49,7 @@ export function meta() {
 export default function HomeRoute() {
 	const toastManager = useKumoToastManager();
 	const { data: mailboxes = [], refetch: refetchMailboxes, isFetched: mailboxesFetched } = useMailboxes();
+	const { data: unreadSummary = [] } = useUnreadSummary();
 	const createMailbox = useCreateMailbox();
 	const deleteMailbox = useDeleteMailbox();
 
@@ -264,6 +266,18 @@ export default function HomeRoute() {
 		}
 	};
 
+	const unreadByMailbox = useMemo(() => {
+		const map = new Map<string, number>();
+		for (const item of unreadSummary) {
+			map.set(item.mailboxId.toLowerCase(), item.unreadCount);
+		}
+		return map;
+	}, [unreadSummary]);
+
+	const totalUnreadMailboxes = useMemo(() => {
+		return unreadSummary.filter((item) => item.unreadCount > 0).length;
+	}, [unreadSummary]);
+
 	const isLoading = !configData;
 
 	return (
@@ -296,6 +310,9 @@ export default function HomeRoute() {
 					{domains.length > 0 && (
 						<p className="text-sm text-kumo-subtle mt-1">
 							已接入 {domains.length} 个域名
+							{totalUnreadMailboxes > 0 && (
+								<> · {totalUnreadMailboxes} 个邮箱有未读</>
+							)}
 						</p>
 					)}
 				</div>
@@ -317,43 +334,58 @@ export default function HomeRoute() {
 					</div>
 				) : visibleAccounts.length > 0 ? (
 					<div className="rounded-xl border border-kumo-line bg-kumo-base overflow-hidden">
-						{visibleAccounts.map((account, idx) => (
-							<RouterLink
-								key={account.id}
-								to={`/mailbox/${account.id}`}
-								className={`group flex items-center gap-4 px-5 py-4 no-underline transition-colors hover:bg-kumo-tint ${
-									idx > 0 ? "border-t border-kumo-line" : ""
-								}`}
-							>
-								<div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-kumo-fill text-sm font-bold text-kumo-default">
-									{account.name.charAt(0).toUpperCase()}
-								</div>
-								<div className="min-w-0 flex-1">
-									<div className="text-sm font-medium text-kumo-default truncate">
-										{account.name}
+						{visibleAccounts.map((account, idx) => {
+							const unreadCount = unreadByMailbox.get(account.email.toLowerCase()) || 0;
+							return (
+								<RouterLink
+									key={account.id}
+									to={`/mailbox/${account.id}`}
+									className={`group flex items-center gap-4 px-5 py-4 no-underline transition-colors hover:bg-kumo-tint ${
+										idx > 0 ? "border-t border-kumo-line" : ""
+									}`}
+								>
+									<div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-kumo-fill text-sm font-bold text-kumo-default relative">
+										{account.name.charAt(0).toUpperCase()}
+										{unreadCount > 0 && (
+											<div className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-orange-500 flex items-center justify-center">
+												<span className="text-xs font-bold text-white">
+													{unreadCount > 99 ? "99+" : unreadCount}
+												</span>
+											</div>
+										)}
 									</div>
-									<div className="text-sm text-kumo-subtle">
-										{account.email}
+									<div className="min-w-0 flex-1">
+										<div className="text-sm font-medium text-kumo-default truncate flex items-center gap-2">
+											{account.name}
+											{unreadCount > 0 && (
+												<span className="text-xs text-orange-600 font-normal">
+													{unreadCount} 未读
+												</span>
+											)}
+										</div>
+										<div className="text-sm text-kumo-subtle">
+											{account.email}
+										</div>
 									</div>
-								</div>
-								<Button
-									variant="ghost"
-									size="sm"
-									shape="square"
-									icon={<TrashIcon size={16} />}
-									aria-label={`删除邮箱 ${account.email}`}
-									onClick={(e) => {
-										e.preventDefault();
-										e.stopPropagation();
-										setMailboxToDelete({
-											id: account.id,
-											email: account.email,
-										});
-										setIsDeleteOpen(true);
-									}}
-								/>
-							</RouterLink>
-						))}
+									<Button
+										variant="ghost"
+										size="sm"
+										shape="square"
+										icon={<TrashIcon size={16} />}
+										aria-label={`删除邮箱 ${account.email}`}
+										onClick={(e) => {
+											e.preventDefault();
+											e.stopPropagation();
+											setMailboxToDelete({
+												id: account.id,
+												email: account.email,
+											});
+											setIsDeleteOpen(true);
+										}}
+									/>
+								</RouterLink>
+							);
+						})}
 					</div>
 				) : (
 					<div className="rounded-xl border border-kumo-line bg-kumo-base py-16 px-6">
