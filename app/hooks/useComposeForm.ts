@@ -3,7 +3,7 @@
 //     https://opensource.org/licenses/Apache-2.0
 
 import { useKumoToastManager } from "@cloudflare/kumo";
-import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
 	buildQuotedReplyBlock,
 	escapeHtml,
@@ -52,6 +52,19 @@ const EMPTY_FIELDS: ComposeFormFields = {
 	subject: "",
 	body: "",
 };
+
+export interface PendingAttachment {
+	id: string;
+	filename: string;
+	type: string;
+	size: number;
+	contentBase64: string;
+	disposition: "attachment" | "inline";
+}
+
+const MAX_FILE_SIZE = 10 * 1024 * 1024;
+const MAX_TOTAL_SIZE = 20 * 1024 * 1024;
+const MAX_FILE_COUNT = 10;
 
 function getPrefixedSubject(subject: string, prefix: "Re" | "Fwd") {
 	const expectedPrefix = `${prefix}: `;
@@ -183,6 +196,7 @@ export function useComposeForm(mailboxId?: string, _folder?: string) {
 	const [error, setError] = useState<string | null>(null);
 	const [isSavingDraft, setIsSavingDraft] = useState(false);
 	const [isSending, setIsSending] = useState(false);
+	const [attachments, setAttachments] = useState<PendingAttachment[]>([]);
 	const lastInitializedOptionsRef = useRef<typeof composeOptions | null>(null);
 	const isDraftEdit = !!composeOptions.draftEmail;
 
@@ -213,7 +227,69 @@ export function useComposeForm(mailboxId?: string, _folder?: string) {
 		setShowCcBcc(initialFields.showCcBcc);
 		setSubject(initialFields.subject);
 		setBody(initialFields.body);
+		setAttachments([]);
 	}, [composeOptions, currentMailbox?.email, sigBlock, templateFetched]);
+
+	const handleAddAttachments = useCallback(async (files: FileList | null) => {
+		if (!files || files.length === 0) return;
+
+		const newAttachments: PendingAttachment[] = [];
+		let totalSize = attachments.reduce((sum, att) => sum + att.size, 0);
+
+		for (let i = 0; i < files.length; i++) {
+			const file = files[i];
+
+			if (attachments.length + newAttachments.length >= MAX_FILE_COUNT) {
+				setError(`最多只能添加 ${MAX_FILE_COUNT} 个附件。`);
+				break;
+			}
+
+			if (file.size > MAX_FILE_SIZE) {
+				setError(`文件 "${file.name}" 太大（最大 10MB）。`);
+				continue;
+			}
+
+			if (totalSize + file.size > MAX_TOTAL_SIZE) {
+				setError(`附件总大小超过限制（最大 20MB）。`);
+				break;
+			}
+
+			try {
+				const base64 = await new Promise<string>((resolve, reject) => {
+					const reader = new FileReader();
+					reader.onload = () => {
+						const result = reader.result as string;
+						const base64Data = result.split(',')[1];
+						resolve(base64Data);
+					};
+					reader.onerror = () => reject(reader.error);
+					reader.readAsDataURL(file);
+				});
+
+				newAttachments.push({
+					id: `${Date.now()}-${i}`,
+					filename: file.name,
+					type: file.type || "application/octet-stream",
+					size: file.size,
+					contentBase64: base64,
+					disposition: "attachment",
+				});
+
+				totalSize += file.size;
+			} catch (err) {
+				setError(`无法读取文件 "${file.name}"。`);
+			}
+		}
+
+		if (newAttachments.length > 0) {
+			setAttachments(prev => [...prev, ...newAttachments]);
+			toastManager.add({ title: `已添加 ${newAttachments.length} 个附件` });
+		}
+	}, [attachments, toastManager]);
+
+	const handleRemoveAttachment = useCallback((id: string) => {
+		setAttachments(prev => prev.filter(att => att.id !== id));
+	}, []);
 
 	const handleSaveDraft = async () => {
 		if (!mailboxId || isSending) return; setIsSavingDraft(true); setError(null);
@@ -254,6 +330,14 @@ export function useComposeForm(mailboxId?: string, _folder?: string) {
 			subject,
 			html: body,
 			text: htmlToPlainText(body),
+			...(attachments.length > 0 ? {
+				attachments: attachments.map(att => ({
+					content: att.contentBase64,
+					filename: att.filename,
+					type: att.type,
+					disposition: att.disposition,
+				}))
+			} : {}),
 		};
 		const draftId = composeOptions.draftEmail?.id; const mode = composeOptions.mode; const originalId = composeOptions.originalEmail?.id || composeOptions.draftEmail?.in_reply_to;
 		setIsSending(true); toastManager.add({ title: "正在发送…" });
@@ -271,5 +355,5 @@ export function useComposeForm(mailboxId?: string, _folder?: string) {
 	const sendAsName = currentMailbox?.settings?.fromName || currentMailbox?.name || "";
 	const sendAsEmail = currentMailbox?.email || mailboxId || "";
 
-	return { to, setTo, cc, setCc, bcc, setBcc, showCcBcc, setShowCcBcc, subject, setSubject, body, setBody, error, setError, isSavingDraft, isSending, formTitle, sendAsName, sendAsEmail, handleSaveDraft, handleSend, closeCompose, closePanel };
+	return { to, setTo, cc, setCc, bcc, setBcc, showCcBcc, setShowCcBcc, subject, setSubject, body, setBody, error, setError, isSavingDraft, isSending, formTitle, sendAsName, sendAsEmail, handleSaveDraft, handleSend, closeCompose, closePanel, attachments, handleAddAttachments, handleRemoveAttachment };
 }

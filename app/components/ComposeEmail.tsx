@@ -3,11 +3,13 @@
 //     https://opensource.org/licenses/Apache-2.0
 
 import { Banner, Button, Dialog, Input, Text } from "@cloudflare/kumo";
-import { FloppyDiskIcon, PaperPlaneTiltIcon } from "@phosphor-icons/react";
+import { FloppyDiskIcon, PaperPlaneTiltIcon, PaperclipIcon, XIcon } from "@phosphor-icons/react";
 import { useParams } from "react-router";
 import { useComposeForm } from "~/hooks/useComposeForm";
 import RichTextEditor from "./RichTextEditor";
 import { useUIStore } from "~/hooks/useUIStore";
+import { formatBytes } from "~/lib/utils";
+import { useRef } from "react";
 
 export default function ComposeEmail() {
 	const { mailboxId, folder } = useParams<{
@@ -16,6 +18,7 @@ export default function ComposeEmail() {
 	}>();
 	
 	const { isComposeModalOpen, closeComposeModal } = useUIStore();
+	const fileInputRef = useRef<HTMLInputElement>(null);
 
 	const {
 		to,
@@ -38,6 +41,9 @@ export default function ComposeEmail() {
 		sendAsEmail,
 		handleSaveDraft,
 		handleSend,
+		attachments,
+		handleAddAttachments,
+		handleRemoveAttachment,
 	} = useComposeForm(mailboxId, folder);
 
 	return (
@@ -112,6 +118,61 @@ export default function ComposeEmail() {
 							正文
 						</Text>
 						<RichTextEditor value={body} onChange={setBody} />
+					</div>
+					<div>
+						<input
+							ref={fileInputRef}
+							type="file"
+							multiple
+							onChange={(e) => {
+								handleAddAttachments(e.target.files);
+								if (fileInputRef.current) fileInputRef.current.value = "";
+							}}
+							className="hidden"
+						/>
+						<Button
+							type="button"
+							variant="ghost"
+							size="sm"
+							icon={<PaperclipIcon size={14} />}
+							onClick={() => fileInputRef.current?.click()}
+							disabled={isSending}
+						>
+							添加附件
+						</Button>
+						{attachments.length > 0 && (
+							<div className="mt-3 space-y-2">
+								<Text size="sm" DANGEROUS_className="font-medium">
+									附件 ({attachments.length})
+								</Text>
+								<div className="space-y-1">
+									{attachments.map((att) => (
+										<div
+											key={att.id}
+											className="flex items-center justify-between gap-2 rounded-md border border-kumo-line px-3 py-2 bg-kumo-fill/30"
+										>
+											<div className="flex items-center gap-2 flex-1 min-w-0">
+												<PaperclipIcon size={14} className="text-kumo-subtle shrink-0" />
+												<span className="text-sm text-kumo-default font-medium truncate">
+													{att.filename}
+												</span>
+												<span className="text-xs text-kumo-subtle shrink-0">
+													{formatBytes(att.size)}
+												</span>
+											</div>
+											<button
+												type="button"
+												onClick={() => handleRemoveAttachment(att.id)}
+												className="text-kumo-subtle hover:text-kumo-error transition-colors"
+												disabled={isSending}
+											>
+												<XIcon size={16} />
+											</button>
+										</div>
+									))}
+								</div>
+							</div>
+						)}
 					</div>
 					<div className="flex justify-between items-center pt-2">
 						<Button
