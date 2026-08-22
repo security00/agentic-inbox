@@ -199,6 +199,7 @@ export function useComposeForm(mailboxId?: string, _folder?: string) {
 	const [attachments, setAttachments] = useState<PendingAttachment[]>([]);
 	const lastInitializedOptionsRef = useRef<typeof composeOptions | null>(null);
 	const isDraftEdit = !!composeOptions.draftEmail;
+	const editorInsertImageRef = useRef<((src: string, alt?: string) => void) | null>(null);
 
 	const formTitle = useMemo(() => {
 		if (isDraftEdit) return "编辑草稿";
@@ -267,13 +268,21 @@ export function useComposeForm(mailboxId?: string, _folder?: string) {
 					reader.readAsDataURL(file);
 				});
 
+				const isImage = file.type.startsWith("image/");
+				
+				// For images, insert into editor and mark as inline
+				if (isImage && editorInsertImageRef.current) {
+					const dataUrl = `data:${file.type};base64,${base64}`;
+					editorInsertImageRef.current(dataUrl, file.name);
+				}
+
 				newAttachments.push({
 					id: `${Date.now()}-${i}`,
 					filename: file.name,
 					type: file.type || "application/octet-stream",
 					size: file.size,
 					contentBase64: base64,
-					disposition: "attachment",
+					disposition: isImage ? "inline" : "attachment",
 				});
 
 				totalSize += file.size;
@@ -290,6 +299,10 @@ export function useComposeForm(mailboxId?: string, _folder?: string) {
 
 	const handleRemoveAttachment = useCallback((id: string) => {
 		setAttachments(prev => prev.filter(att => att.id !== id));
+	}, []);
+
+	const setEditorInsertImage = useCallback((fn: (src: string, alt?: string) => void) => {
+		editorInsertImageRef.current = fn;
 	}, []);
 
 	const handleSaveDraft = async () => {
@@ -323,22 +336,48 @@ export function useComposeForm(mailboxId?: string, _folder?: string) {
 		const ccRecipients = splitEmailList(cc); const bccRecipients = splitEmailList(bcc);
 		const fromName = currentMailbox.settings?.fromName || currentMailbox.name;
 		const from = fromName && fromName !== currentMailbox.email ? { email: currentMailbox.email, name: fromName } : currentMailbox.email;
+		
+		// Process inline images: convert data URLs to CID references
+		let processedHtml = body;
+		const processedAttachments = attachments.map(att => {
+			const isInlineImage = att.disposition === "inline" && att.type.startsWith("image/");
+			
+			// For inline images, generate contentId and replace in HTML
+			if (isInlineImage) {
+				const contentId = `img-${att.id}`;
+				const dataUrl = `data:${att.type};base64,${att.contentBase64}`;
+				const escapedDataUrl = dataUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+				processedHtml = processedHtml.replace(
+					new RegExp(`src="${escapedDataUrl}"`, 'g'),
+					`src="cid:${contentId}"`
+				);
+				
+				return {
+					content: att.contentBase64,
+					filename: att.filename,
+					type: att.type,
+					disposition: att.disposition,
+					contentId,
+				};
+			}
+			
+			return {
+				content: att.contentBase64,
+				filename: att.filename,
+				type: att.type,
+				disposition: att.disposition,
+			};
+		});
+		
 		const emailData = {
 			to: toEmailListValue(toRecipients),
 			cc: toEmailListValue(ccRecipients),
 			bcc: toEmailListValue(bccRecipients),
 			from,
 			subject,
-			html: body,
-			text: htmlToPlainText(body),
-			...(attachments.length > 0 ? {
-				attachments: attachments.map(att => ({
-					content: att.contentBase64,
-					filename: att.filename,
-					type: att.type,
-					disposition: att.disposition,
-				}))
-			} : {}),
+			html: processedHtml,
+			text: htmlToPlainText(processedHtml),
+			...(processedAttachments.length > 0 ? { attachments: processedAttachments } : {}),
 		};
 		const draftId = composeOptions.draftEmail?.id; const mode = composeOptions.mode; const originalId = composeOptions.originalEmail?.id || composeOptions.draftEmail?.in_reply_to;
 		setIsSending(true); toastManager.add({ title: "正在发送…" });
@@ -356,5 +395,5 @@ export function useComposeForm(mailboxId?: string, _folder?: string) {
 	const sendAsName = currentMailbox?.settings?.fromName || currentMailbox?.name || "";
 	const sendAsEmail = currentMailbox?.email || mailboxId || "";
 
-	return { to, setTo, cc, setCc, bcc, setBcc, showCcBcc, setShowCcBcc, subject, setSubject, body, setBody, error, setError, isSavingDraft, isSending, formTitle, sendAsName, sendAsEmail, handleSaveDraft, handleSend, closeCompose, closePanel, attachments, handleAddAttachments, handleRemoveAttachment };
+	return { to, setTo, cc, setCc, bcc, setBcc, showCcBcc, setShowCcBcc, subject, setSubject, body, setBody, error, setError, isSavingDraft, isSending, formTitle, sendAsName, sendAsEmail, handleSaveDraft, handleSend, closeCompose, closePanel, attachments, handleAddAttachments, handleRemoveAttachment, setEditorInsertImage };
 }
