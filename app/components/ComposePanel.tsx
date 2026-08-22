@@ -3,16 +3,21 @@
 //     https://opensource.org/licenses/Apache-2.0
 
 import { Banner, Button, Input } from "@cloudflare/kumo";
-import { FloppyDiskIcon, PaperPlaneTiltIcon, XIcon } from "@phosphor-icons/react";
+import { FloppyDiskIcon, PaperPlaneTiltIcon, PaperclipIcon, XIcon } from "@phosphor-icons/react";
 import { useParams } from "react-router";
 import { useComposeForm } from "~/hooks/useComposeForm";
-import RichTextEditor from "./RichTextEditor";
+import RichTextEditor, { type RichTextEditorRef } from "./RichTextEditor";
+import { formatBytes } from "~/lib/utils";
+import { useRef } from "react";
 
 export default function ComposePanel() {
 	const { mailboxId, folder } = useParams<{
 		mailboxId: string;
 		folder: string;
 	}>();
+
+	const fileInputRef = useRef<HTMLInputElement>(null);
+	const editorRef = useRef<RichTextEditorRef>(null);
 
 	const {
 		to,
@@ -27,6 +32,10 @@ export default function ComposePanel() {
 		setSubject,
 		body,
 		setBody,
+		attachments,
+		handleAddAttachments,
+		handleRemoveAttachment,
+		setEditorInsertImage,
 		error,
 		isSavingDraft,
 		isSending,
@@ -38,6 +47,11 @@ export default function ComposePanel() {
 		closeCompose,
 		closePanel,
 	} = useComposeForm(mailboxId, folder);
+
+	// Connect editor to form
+	if (editorRef.current && !isSending) {
+		setEditorInsertImage(editorRef.current.insertImage);
+	}
 
 	return (
 		<div className="flex flex-col h-full bg-kumo-base">
@@ -149,18 +163,84 @@ export default function ComposePanel() {
 
 					<div className="border border-kumo-line rounded-md overflow-hidden bg-kumo-base">
 						<RichTextEditor
+							ref={editorRef}
 							value={body}
 							onChange={setBody}
+							onImagePaste={async (file) => {
+								await handleAddAttachments([file]);
+							}}
 						/>
 					</div>
+
+					{/* Attachments */}
+					{attachments.length > 0 && (
+						<div className="space-y-2">
+							<div className="text-sm font-medium text-kumo-default">附件</div>
+							<div className="flex flex-wrap gap-2">
+								{attachments.map((att) => (
+									<div
+										key={att.id}
+										className="flex items-center gap-2 px-3 py-2 bg-kumo-tint rounded-md border border-kumo-line text-xs"
+									>
+										<span className="text-kumo-default truncate max-w-[200px]">
+											{att.file.name}
+											{att.insertedInline && att.isImage && (
+												<span className="ml-1 text-kumo-subtle">(正文图片)</span>
+											)}
+										</span>
+										<span className="text-kumo-subtle shrink-0">
+											{formatBytes(att.file.size)}
+										</span>
+										<button
+											type="button"
+											onClick={() => handleRemoveAttachment(att.id)}
+											className="ml-1 text-kumo-subtle hover:text-kumo-default"
+											aria-label="移除附件"
+										>
+											<XIcon size={14} />
+										</button>
+									</div>
+								))}
+							</div>
+						</div>
+					)}
+
+					<input
+						ref={fileInputRef}
+						type="file"
+						multiple
+						accept="*/*"
+						className="hidden"
+						onChange={(e) => {
+							const files = Array.from(e.target.files || []);
+							if (files.length > 0) {
+								handleAddAttachments(files);
+							}
+							if (fileInputRef.current) {
+								fileInputRef.current.value = '';
+							}
+						}}
+					/>
 				</div>
 
 				{/* Footer actions */}
 				<div className="mt-auto px-4 py-3 border-t border-kumo-line bg-kumo-fill/30 shrink-0 md:px-6">
 					<div className="flex items-center justify-between">
-						<Button type="button" variant="ghost" size="sm" onClick={closeCompose} disabled={isSending}>
-							丢弃
-						</Button>
+						<div className="flex items-center gap-2">
+							<Button type="button" variant="ghost" size="sm" onClick={closeCompose} disabled={isSending}>
+								丢弃
+							</Button>
+							<Button
+								type="button"
+								variant="ghost"
+								size="sm"
+								icon={<PaperclipIcon size={14} />}
+								onClick={() => fileInputRef.current?.click()}
+								disabled={isSending}
+							>
+								添加附件
+							</Button>
+						</div>
 						<div className="flex items-center gap-2">
 							<Button
 								type="button"

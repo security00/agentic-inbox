@@ -3,11 +3,13 @@
 //     https://opensource.org/licenses/Apache-2.0
 
 import { Banner, Button, Dialog, Input, Text } from "@cloudflare/kumo";
-import { FloppyDiskIcon, PaperPlaneTiltIcon } from "@phosphor-icons/react";
+import { FloppyDiskIcon, PaperPlaneTiltIcon, PaperclipIcon, XIcon } from "@phosphor-icons/react";
 import { useParams } from "react-router";
 import { useComposeForm } from "~/hooks/useComposeForm";
-import RichTextEditor from "./RichTextEditor";
+import RichTextEditor, { type RichTextEditorRef } from "./RichTextEditor";
 import { useUIStore } from "~/hooks/useUIStore";
+import { formatBytes } from "~/lib/utils";
+import { useRef } from "react";
 
 export default function ComposeEmail() {
 	const { mailboxId, folder } = useParams<{
@@ -16,6 +18,9 @@ export default function ComposeEmail() {
 	}>();
 	
 	const { isComposeModalOpen, closeComposeModal } = useUIStore();
+
+	const fileInputRef = useRef<HTMLInputElement>(null);
+	const editorRef = useRef<RichTextEditorRef>(null);
 
 	const {
 		to,
@@ -30,6 +35,10 @@ export default function ComposeEmail() {
 		setSubject,
 		body,
 		setBody,
+		attachments,
+		handleAddAttachments,
+		handleRemoveAttachment,
+		setEditorInsertImage,
 		error,
 		isSavingDraft,
 		isSending,
@@ -39,6 +48,11 @@ export default function ComposeEmail() {
 		handleSaveDraft,
 		handleSend,
 	} = useComposeForm(mailboxId, folder);
+
+	// Connect editor to form
+	if (editorRef.current && !isSending) {
+		setEditorInsertImage(editorRef.current.insertImage);
+	}
 
 	return (
 		<Dialog.Root
@@ -111,18 +125,90 @@ export default function ComposeEmail() {
 						<Text size="sm" DANGEROUS_className="font-medium mb-1.5 block">
 							正文
 						</Text>
-						<RichTextEditor value={body} onChange={setBody} />
+						<RichTextEditor 
+							ref={editorRef}
+							value={body} 
+							onChange={setBody}
+							onImagePaste={async (file) => {
+								await handleAddAttachments([file]);
+							}}
+						/>
 					</div>
+
+					{/* Attachments */}
+					{attachments.length > 0 && (
+						<div className="space-y-2">
+							<Text size="sm" DANGEROUS_className="font-medium">
+								附件
+							</Text>
+							<div className="flex flex-wrap gap-2">
+								{attachments.map((att) => (
+									<div
+										key={att.id}
+										className="flex items-center gap-2 px-3 py-2 bg-kumo-tint rounded-md border border-kumo-line text-xs"
+									>
+										<span className="text-kumo-default truncate max-w-[200px]">
+											{att.file.name}
+											{att.insertedInline && att.isImage && (
+												<span className="ml-1 text-kumo-subtle">(正文图片)</span>
+											)}
+										</span>
+										<span className="text-kumo-subtle shrink-0">
+											{formatBytes(att.file.size)}
+										</span>
+										<button
+											type="button"
+											onClick={() => handleRemoveAttachment(att.id)}
+											className="ml-1 text-kumo-subtle hover:text-kumo-default"
+											aria-label="移除附件"
+										>
+											<XIcon size={14} />
+										</button>
+									</div>
+								))}
+							</div>
+						</div>
+					)}
+
+					<input
+						ref={fileInputRef}
+						type="file"
+						multiple
+						accept="*/*"
+						className="hidden"
+						onChange={(e) => {
+							const files = Array.from(e.target.files || []);
+							if (files.length > 0) {
+								handleAddAttachments(files);
+							}
+							if (fileInputRef.current) {
+								fileInputRef.current.value = '';
+							}
+						}}
+					/>
+
 					<div className="flex justify-between items-center pt-2">
-						<Button
-							type="button"
-							variant="ghost"
-							size="sm"
-							onClick={closeComposeModal}
-							disabled={isSending}
-						>
-							丢弃
-						</Button>
+						<div className="flex items-center gap-2">
+							<Button
+								type="button"
+								variant="ghost"
+								size="sm"
+								onClick={closeComposeModal}
+								disabled={isSending}
+							>
+								丢弃
+							</Button>
+							<Button
+								type="button"
+								variant="ghost"
+								size="sm"
+								icon={<PaperclipIcon size={14} />}
+								onClick={() => fileInputRef.current?.click()}
+								disabled={isSending}
+							>
+								添加附件
+							</Button>
+						</div>
 						<div className="flex items-center gap-2">
 							<Button
 								type="button"

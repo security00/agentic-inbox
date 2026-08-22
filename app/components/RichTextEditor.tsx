@@ -24,26 +24,36 @@ import LinkExtension from "@tiptap/extension-link";
 import TextAlign from "@tiptap/extension-text-align";
 import { TextStyle } from "@tiptap/extension-text-style";
 import Underline from "@tiptap/extension-underline";
-import { EditorContent, useEditor } from "@tiptap/react";
+import { type Editor, EditorContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useImperativeHandle, forwardRef } from "react";
 
 interface RichTextEditorProps {
 	value: string;
 	onChange: (value: string) => void;
+	onImagePaste?: (file: File) => void;
 }
 
-export default function RichTextEditor({
+export interface RichTextEditorRef {
+	insertImage: (src: string, alt?: string) => void;
+	getEditor: () => Editor | null;
+}
+
+const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(({
 	value,
 	onChange,
-}: RichTextEditorProps) {
+	onImagePaste,
+}, ref) => {
 	const editor = useEditor({
 		extensions: [
 			StarterKit,
 			Underline,
 			TextAlign.configure({ types: ["heading", "paragraph"] }),
 			LinkExtension.configure({ openOnClick: false }),
-			TiptapImage,
+			TiptapImage.configure({
+				inline: true,
+				allowBase64: true,
+			}),
 			TextStyle,
 			Color,
 			Highlight.configure({ multicolor: true }),
@@ -52,13 +62,39 @@ export default function RichTextEditor({
 		editorProps: {
 			attributes: {
 				class:
-					"prose prose-sm max-w-none focus:outline-none min-h-[180px] p-3 text-sm [&_blockquote]:border-l-2 [&_blockquote]:border-kumo-line [&_blockquote]:pl-3 [&_blockquote]:text-kumo-subtle [&_blockquote]:bg-kumo-tint [&_blockquote]:py-1 [&_blockquote]:my-2 [&_blockquote]:text-xs [&_blockquote]:rounded-r-sm",
+					"prose prose-sm max-w-none focus:outline-none min-h-[180px] p-3 text-sm [&_blockquote]:border-l-2 [&_blockquote]:border-kumo-line [&_blockquote]:pl-3 [&_blockquote]:text-kumo-subtle [&_blockquote]:bg-kumo-tint [&_blockquote]:py-1 [&_blockquote]:my-2 [&_blockquote]:text-xs [&_blockquote]:rounded-r-sm [&_img]:max-w-full [&_img]:h-auto [&_img]:rounded",
+			},
+			handlePaste: (view, event) => {
+				const items = event.clipboardData?.items;
+				if (!items || !onImagePaste) return false;
+
+				for (let i = 0; i < items.length; i++) {
+					const item = items[i];
+					if (item.type.startsWith("image/")) {
+						const file = item.getAsFile();
+						if (file) {
+							event.preventDefault();
+							onImagePaste(file);
+							return true;
+						}
+					}
+				}
+				return false;
 			},
 		},
 		onUpdate: ({ editor }) => {
 			onChange(editor.getHTML());
 		},
 	});
+
+	useImperativeHandle(ref, () => ({
+		insertImage: (src: string, alt?: string) => {
+			if (editor && !editor.isDestroyed) {
+				editor.chain().focus().setImage({ src, alt }).run();
+			}
+		},
+		getEditor: () => editor,
+	}), [editor]);
 
 	useEffect(() => {
 		if (editor && !editor.isDestroyed && value !== editor.getHTML()) {
@@ -236,4 +272,8 @@ export default function RichTextEditor({
 			</div>
 		</div>
 	);
-}
+});
+
+RichTextEditor.displayName = "RichTextEditor";
+
+export default RichTextEditor;
