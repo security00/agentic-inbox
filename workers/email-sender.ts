@@ -8,7 +8,18 @@
  * Uses the `send_email` Worker binding (`env.EMAIL.send()`) to send emails.
  *
  * See: https://developers.cloudflare.com/email-service/api/send-emails/workers-api/
+ *
+ * Attachment content note (Workers binding ≠ REST API):
+ * - Workers binding: `content` must be raw bytes (`ArrayBuffer` / `ArrayBufferView`).
+ *   A string is treated as UTF-8 text, NOT base64 — so base64 from the UI must be decoded
+ *   before `binding.send()`. Official example:
+ *   https://developers.cloudflare.com/email-service/examples/email-sending/email-attachments/
+ * - REST API: expects base64 strings. Do not pass binding-decoded bytes back into REST.
+ * Callers (compose / reply / forward) still send base64 strings over the HTTP API;
+ * `storeAttachments` decodes for R2 separately. This module is the single decode-for-send exit.
  */
+
+export type AttachmentContent = string | ArrayBuffer | ArrayBufferView;
 
 export interface SendEmailParams {
 	to: string | string[];
@@ -20,13 +31,27 @@ export interface SendEmailParams {
 	bcc?: string | string[];
 	replyTo?: string | { email: string; name: string };
 	attachments?: {
-		content: string; // base64 encoded
+		/** Base64 string from the HTTP API, or raw bytes if already decoded. */
+		content: AttachmentContent;
 		filename: string;
 		type: string;
 		disposition: "attachment" | "inline";
 		contentId?: string;
 	}[];
 	headers?: Record<string, string>;
+}
+
+/**
+ * Decode attachment content for the Workers Email binding.
+ * Strings are treated as base64 (API/UI contract). Binary is passed through.
+ * Does not strip a `data:*;base64,` prefix — callers must send pure base64.
+ */
+export function toBindingAttachmentContent(content: AttachmentContent): ArrayBuffer | ArrayBufferView {
+	if (typeof content === "string") {
+		const binaryStr = atob(content);
+		return Uint8Array.from(binaryStr, (c) => c.charCodeAt(0));
+	}
+	return content;
 }
 
 /**
@@ -59,7 +84,7 @@ export async function sendEmail(
 
 	if (params.attachments && params.attachments.length > 0) {
 		message.attachments = params.attachments.map((att) => ({
-			content: att.content,
+			content: toBindingAttachmentContent(att.content),
 			filename: att.filename,
 			type: att.type,
 			disposition: att.disposition,
