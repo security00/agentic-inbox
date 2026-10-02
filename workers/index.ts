@@ -6,7 +6,7 @@ import { type Context, Hono } from "hono";
 import { cors } from "hono/cors";
 import PostalMime from "postal-mime";
 import { z } from "zod";
-import { sendEmail } from "./email-sender";
+import { sendEmail, sendFailure } from "./email-sender";
 import { storeAttachments, type StoredAttachment } from "./lib/attachments";
 import {
 	validateSender,
@@ -304,6 +304,22 @@ app.post("/api/v1/mailboxes/:mailboxId/emails", async (c: AppContext) => {
 	const stub = c.var.mailboxStub;
 	const rateLimitError = await (stub as any).checkSendRateLimit();
 	if (rateLimitError) return c.json({ error: rateLimitError }, 429);
+	// Send synchronously so delivery errors (e.g. sending domain not onboarded to
+	// Cloudflare Email Sending, or recipient not allowed) are returned to the UI
+	// instead of being swallowed in waitUntil while the UI reports "sent".
+	let deliveredMessageId = outgoingMessageId;
+	try {
+		const sent = await sendEmail(c.env.EMAIL, {
+			to, cc, bcc, from, subject, html, text,
+			attachments: attachments?.map((att) => ({ content: att.content, filename: att.filename, type: att.type, disposition: att.disposition || "attachment", contentId: att.contentId })),
+			...(in_reply_to ? { headers: buildThreadingHeaders(in_reply_to, references || []) } : {}),
+		});
+		// Store the Message-ID Cloudflare actually sent so customer replies thread correctly.
+		if (sent.messageId) deliveredMessageId = sent.messageId.replace(/^<|>$/g, "");
+	} catch (e) {
+		return sendFailure(c, e);
+	}
+
 	const attachmentData = await storeAttachments(c.env.BUCKET, messageId, attachments);
 
 	await stub.createEmail(Folders.SENT, {
@@ -312,24 +328,17 @@ app.post("/api/v1/mailboxes/:mailboxId/emails", async (c: AppContext) => {
 		bcc: bcc ? (Array.isArray(bcc) ? bcc.join(", ") : bcc).toLowerCase() : null,
 		date: new Date().toISOString(), body: html || text || "",
 		in_reply_to: in_reply_to || null, email_references: references ? JSON.stringify(references) : null,
-		thread_id: thread_id || in_reply_to || messageId, message_id: outgoingMessageId,
+		thread_id: thread_id || in_reply_to || messageId, message_id: deliveredMessageId,
 		raw_headers: JSON.stringify([
 			{ key: "from", value: typeof from === "string" ? from : `${from.name} <${from.email}>` },
 			{ key: "to", value: Array.isArray(to) ? to.join(", ") : to },
 			...(cc ? [{ key: "cc", value: Array.isArray(cc) ? cc.join(", ") : cc }] : []),
 			...(bcc ? [{ key: "bcc", value: Array.isArray(bcc) ? bcc.join(", ") : bcc }] : []),
 			{ key: "subject", value: subject }, { key: "date", value: new Date().toISOString() },
-			{ key: "message-id", value: `<${outgoingMessageId}>` },
+			{ key: "message-id", value: `<${deliveredMessageId}>` },
 		]),
 	}, attachmentData);
 
-	c.executionCtx.waitUntil(
-		sendEmail(c.env.EMAIL, {
-			to, cc, bcc, from, subject, html, text,
-			attachments: attachments?.map((att) => ({ content: att.content, filename: att.filename, type: att.type, disposition: att.disposition || "attachment", contentId: att.contentId })),
-			...(in_reply_to ? { headers: buildThreadingHeaders(in_reply_to, references || []) } : {}),
-		}).catch((e) => console.error("Deferred email delivery failed:", (e as Error).message)),
-	);
 	return c.json({ id: messageId, status: "sent" }, 202);
 });
 

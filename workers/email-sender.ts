@@ -95,3 +95,18 @@ export async function sendEmail(
 	const result = await binding.send(message as any);
 	return { messageId: result.messageId };
 }
+
+/**
+ * Build a JSON error response for a failed send. Used by the HTTP routes, which
+ * send synchronously so the UI sees real delivery failures (previously sends were
+ * deferred via waitUntil and failures were only logged, so the UI showed "sent").
+ */
+export function sendFailure(
+	c: { json: (body: unknown, status: 502) => Response },
+	e: unknown,
+): Response {
+	const err = e as { message?: string; code?: string };
+	const message = err?.message || String(e);
+	console.error("Email delivery failed:", err?.code ?? "", message);
+	return c.json({ error: `Email delivery failed: ${message}`, ...(err?.code ? { code: err.code } : {}) }, 502);
+}
