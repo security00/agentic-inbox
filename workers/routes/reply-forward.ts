@@ -3,7 +3,7 @@
 //     https://opensource.org/licenses/Apache-2.0
 
 import type { Context } from "hono";
-import { sendEmail } from "../email-sender";
+import { sendEmail, sendFailure } from "../email-sender";
 import { storeAttachments } from "../lib/attachments";
 import type { EmailFull } from "../lib/schemas";
 import {
@@ -53,6 +53,32 @@ export async function handleReplyEmail(c: AppContext) {
 		return c.json({ error: rateLimitError }, 429);
 	}
 
+	// Send synchronously so delivery errors reach the UI (see sendFailure).
+	let deliveredMessageId = outgoingMessageId;
+	try {
+		const sent = await sendEmail(c.env.EMAIL, {
+			to,
+			cc,
+			bcc,
+			from,
+			subject,
+			html,
+			text,
+			attachments: attachments?.map((att) => ({
+				content: att.content,
+				filename: att.filename,
+				type: att.type,
+				disposition: att.disposition,
+				contentId: att.contentId,
+			})),
+			headers: buildThreadingHeaders(originalMsgId, references),
+		});
+		// Store the Message-ID Cloudflare actually sent so customer replies thread correctly.
+		if (sent.messageId) deliveredMessageId = sent.messageId.replace(/^<|>$/g, "");
+	} catch (e) {
+		return sendFailure(c, e);
+	}
+
 	const attachmentData = await storeAttachments(c.env.BUCKET, messageId, attachments);
 
 	await stub.createEmail(
@@ -69,7 +95,7 @@ export async function handleReplyEmail(c: AppContext) {
 			in_reply_to: originalMsgId,
 			email_references: JSON.stringify(references),
 			thread_id: thread_id,
-			message_id: outgoingMessageId,
+			message_id: deliveredMessageId,
 			raw_headers: JSON.stringify([
 				{ key: "from", value: typeof from === "string" ? from : `${from.name} <${from.email}>` },
 				{ key: "to", value: Array.isArray(to) ? to.join(", ") : to },
@@ -77,7 +103,7 @@ export async function handleReplyEmail(c: AppContext) {
 				...(bcc ? [{ key: "bcc", value: Array.isArray(bcc) ? bcc.join(", ") : bcc }] : []),
 				{ key: "subject", value: subject },
 				{ key: "date", value: new Date().toISOString() },
-				{ key: "message-id", value: `<${outgoingMessageId}>` },
+				{ key: "message-id", value: `<${deliveredMessageId}>` },
 				...(originalMsgId ? [{ key: "in-reply-to", value: `<${originalMsgId}>` }] : []),
 				...(references.length > 0 ? [{ key: "references", value: references.map((r: string) => `<${r}>`).join(" ") }] : []),
 			]),
@@ -86,28 +112,6 @@ export async function handleReplyEmail(c: AppContext) {
 	);
 
 	await stub.markThreadRead(thread_id);
-
-	c.executionCtx.waitUntil(
-		sendEmail(c.env.EMAIL, {
-			to,
-			cc,
-			bcc,
-			from,
-			subject,
-			html,
-			text,
-			attachments: attachments?.map((att) => ({
-				content: att.content,
-				filename: att.filename,
-				type: att.type,
-				disposition: att.disposition,
-				contentId: att.contentId,
-			})),
-			headers: buildThreadingHeaders(originalMsgId, references),
-		}).catch((e) => {
-			console.error("Deferred reply delivery failed:", (e as Error).message);
-		}),
-	);
 
 	return c.json({ id: messageId, status: "sent" }, 202);
 }
@@ -143,6 +147,31 @@ export async function handleForwardEmail(c: AppContext) {
 		return c.json({ error: rateLimitError }, 429);
 	}
 
+	// Send synchronously so delivery errors reach the UI (see sendFailure).
+	let deliveredMessageId = outgoingMessageId;
+	try {
+		const sent = await sendEmail(c.env.EMAIL, {
+			to,
+			cc,
+			bcc,
+			from,
+			subject,
+			html,
+			text,
+			attachments: attachments?.map((att) => ({
+				content: att.content,
+				filename: att.filename,
+				type: att.type,
+				disposition: att.disposition,
+				contentId: att.contentId,
+			})),
+		});
+		// Store the Message-ID Cloudflare actually sent so customer replies thread correctly.
+		if (sent.messageId) deliveredMessageId = sent.messageId.replace(/^<|>$/g, "");
+	} catch (e) {
+		return sendFailure(c, e);
+	}
+
 	const attachmentData = await storeAttachments(c.env.BUCKET, messageId, attachments);
 
 	await stub.createEmail(
@@ -159,7 +188,7 @@ export async function handleForwardEmail(c: AppContext) {
 			in_reply_to: null,
 			email_references: null,
 			thread_id: messageId,
-			message_id: outgoingMessageId,
+			message_id: deliveredMessageId,
 			raw_headers: JSON.stringify([
 				{ key: "from", value: typeof from === "string" ? from : `${from.name} <${from.email}>` },
 				{ key: "to", value: Array.isArray(to) ? to.join(", ") : to },
@@ -167,32 +196,12 @@ export async function handleForwardEmail(c: AppContext) {
 				...(bcc ? [{ key: "bcc", value: Array.isArray(bcc) ? bcc.join(", ") : bcc }] : []),
 				{ key: "subject", value: subject },
 				{ key: "date", value: new Date().toISOString() },
-				{ key: "message-id", value: `<${outgoingMessageId}>` },
+				{ key: "message-id", value: `<${deliveredMessageId}>` },
 			]),
 		},
 		attachmentData,
 	);
 
-	c.executionCtx.waitUntil(
-		sendEmail(c.env.EMAIL, {
-			to,
-			cc,
-			bcc,
-			from,
-			subject,
-			html,
-			text,
-			attachments: attachments?.map((att) => ({
-				content: att.content,
-				filename: att.filename,
-				type: att.type,
-				disposition: att.disposition,
-				contentId: att.contentId,
-			})),
-		}).catch((e) => {
-			console.error("Deferred forward delivery failed:", (e as Error).message);
-		}),
-	);
 
 	return c.json({ id: messageId, status: "sent" }, 202);
 }
