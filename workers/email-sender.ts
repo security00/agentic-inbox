@@ -106,7 +106,18 @@ export function sendFailure(
 	e: unknown,
 ): Response {
 	const err = e as { message?: string; code?: string };
-	const message = err?.message || String(e);
-	console.error("Email delivery failed:", err?.code ?? "", message);
-	return c.json({ error: `Email delivery failed: ${message}`, ...(err?.code ? { code: err.code } : {}) }, 502);
+	const code = err?.code || "";
+	let message = err?.message || String(e);
+	// Surface Email Sending domain-onboarding failures clearly for operators.
+	if (
+		code === "E_SENDER_NOT_VERIFIED" ||
+		code === "E_SENDER_DOMAIN_NOT_AVAILABLE" ||
+		/not verified|not available for sending|not onboarded/i.test(message)
+	) {
+		message =
+			`${message} — onboard this domain under Cloudflare Email Service → Email Sending ` +
+			`(adds cf-bounce SPF/DKIM), then retry.`;
+	}
+	console.error("Email delivery failed:", code, message);
+	return c.json({ error: `Email delivery failed: ${message}`, ...(code ? { code } : {}) }, 502);
 }
