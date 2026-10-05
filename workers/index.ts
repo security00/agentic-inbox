@@ -2,6 +2,7 @@
 // Licensed under the Apache 2.0 license found in the LICENSE file or at:
 //     https://opensource.org/licenses/Apache-2.0
 
+import { getAgentByName } from "agents";
 import { type Context, Hono } from "hono";
 import { cors } from "hono/cors";
 import PostalMime from "postal-mime";
@@ -537,11 +538,36 @@ async function receiveEmail(event: { raw: ReadableStream; rawSize: number }, env
 		thread_id: threadId, message_id: originalMessageId, raw_headers: JSON.stringify(parsedEmail.headers),
 	}, attachmentData);
 
-	const agentStub = env.EMAIL_AGENT.get(env.EMAIL_AGENT.idFromName(mailboxId));
-	ctx.waitUntil(agentStub.fetch(new Request("https://agents/onNewEmail", {
-		method: "POST", headers: { "Content-Type": "application/json" },
-		body: JSON.stringify({ mailboxId, emailId: messageId, sender: (parsedEmail.from?.address || "").toLowerCase(), subject: parsedEmail.subject || "", threadId }),
-	})).catch((e) => console.error("Auto-draft trigger failed:", (e as Error).message)));
+	// PartyServer/Agent DO stubs must be obtained via getAgentByName so the
+	// instance name is hydrated (x-partykit-room). Raw idFromName()+get()+fetch()
+	// leaves the DO unnamed and throws: "Error in EmailAgent:<unnamed> fetch".
+	ctx.waitUntil((async () => {
+		try {
+			const agentStub = await getAgentByName(env.EMAIL_AGENT, mailboxId);
+			const res = await agentStub.fetch(new Request("https://agents/onNewEmail", {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+					"x-partykit-room": mailboxId,
+				},
+				body: JSON.stringify({
+					mailboxId,
+					emailId: messageId,
+					sender: (parsedEmail.from?.address || "").toLowerCase(),
+					subject: parsedEmail.subject || "",
+					threadId,
+				}),
+			}));
+			const bodyText = await res.text();
+			if (!res.ok) {
+				console.error("Auto-draft trigger HTTP", res.status, bodyText.slice(0, 500));
+				return;
+			}
+			console.log("Auto-draft trigger ok:", mailboxId, bodyText.slice(0, 200));
+		} catch (e) {
+			console.error("Auto-draft trigger failed:", (e as Error).message);
+		}
+	})());
 }
 
 export { app, receiveEmail };

@@ -546,6 +546,12 @@ Based on the email content and thread context above, draft a reply using draft_r
 
 			await this.persistMessages([...this.messages, ...newMessages]);
 
+			console.log(
+				"Auto-draft success:",
+				emailData.mailboxId,
+				emailData.emailId,
+				draftToolCalled ? "via_tool" : "via_inline",
+			);
 			return { status: "draft_generated", text: result.text };
 		} catch (e) {
 			console.error("Auto-draft failed:", (e as Error).message);
